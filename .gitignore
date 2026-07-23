@@ -10,6 +10,7 @@ __pycache__/
 .venv/
 venv/
 
-# HF / caches
+# HF / caches / temp shard downloads
 .cache/
 hf_cache/
+pq_tmp/
