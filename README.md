@@ -118,6 +118,27 @@ To add a source to an existing dataset without rebuilding from scratch, enable i
 `config/mix.json` and run `python src/augment_dataset.py` (reuses the current
 `data/*.jsonl`, dedupes new rows against them, and rewrites a complete dataset).
 
+## Fruit Bible + input interface
+
+Two reference/authoring artifacts, both generated from `data/fruit_bible.json` (64 fruits):
+
+- **`deliverables/Fruit_Drama_Bible.xlsx`** — the character bible. Sheets: *Fruit Bible*
+  (each fruit's dominant gender, archetype, personality, character, cheating pattern,
+  properties, and all four life-stages — Growth / Prime / Ripening / Senescence),
+  *Life Stages & Legend*, *Roles & Dispositions*, and *Story Builder (example)*.
+  Rebuild: `python src/build_bible_xlsx.py`.
+- **`interface/index.html`** — the input system. A clean, offline, single-file page:
+  click fruits (emoji + gender), set each one's gender · life-stage · role · disposition ·
+  dramatic character + a note, write a context/location/setting, and it assembles the full
+  system+user prompt (with each fruit's stage-specific traits and cheating pattern pulled
+  from the bible) for the fruit-drama LLM — copy as text or as a `messages` JSON.
+  Rebuild: `python src/build_interface.py`. Open by double-clicking the file.
+
+The four life-stages: **Growth** (green/young — insecure, forming) → **Prime**
+(ripe/peak — confident, powerful) → **Ripening** (the fall — betrayal, exposure) →
+**Senescence** (rotten — collapse). Each fruit's traits differ per stage; most fruits are
+dominant in one gender (e.g. Peach = female, Banana = male) but either is selectable.
+
 ## Next phase (not done here)
 
 LoRA SFT on a 7–8B instruct base (e.g. Llama-3.1-8B-Instruct or Qwen2.5-7B-Instruct)

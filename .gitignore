@@ -15,3 +15,6 @@ venv/
 .cache/
 hf_cache/
 pq_tmp/
+
+# local preview config
+.claude/
