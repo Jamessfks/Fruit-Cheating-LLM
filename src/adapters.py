@@ -8,8 +8,10 @@ them locally with pyarrow (fast), one shard at a time then delete it, to respect
 a small disk budget. Tiny/unconverted datasets are downloaded in full.
 """
 import os
+import re
 import gzip
 import json
+import time
 import tempfile
 import urllib.request
 
@@ -17,6 +19,7 @@ import filters as F
 
 _UA = {"User-Agent": "fruit-cheating-llm/1.0"}
 _PQ_TMP = os.environ.get("PQ_TMP", tempfile.gettempdir())
+_THINK = re.compile(r"^.*?</think>", re.S)  # strip leading <think>...</think> reasoning
 
 
 def _parquet_files(dataset, split, config=None):
@@ -33,14 +36,30 @@ def _parquet_files(dataset, split, config=None):
     return out
 
 
-def _download(url, path, timeout=180):
-    req = urllib.request.Request(url, headers=_UA)
-    with urllib.request.urlopen(req, timeout=timeout) as r, open(path, "wb") as f:
-        while True:
-            chunk = r.read(1 << 20)
-            if not chunk:
-                break
-            f.write(chunk)
+def _download(url, path, timeout=300, retries=5):
+    """Download with retries + HTTP-range resume (network here is flaky/slow)."""
+    last = None
+    for attempt in range(retries):
+        have = os.path.getsize(path) if os.path.exists(path) else 0
+        headers = dict(_UA)
+        if have:
+            headers["Range"] = f"bytes={have}-"
+        try:
+            resp = urllib.request.urlopen(
+                urllib.request.Request(url, headers=headers), timeout=timeout)
+            # if we asked to resume but server ignored the range, start over
+            mode = "ab" if (have and getattr(resp, "status", 200) == 206) else "wb"
+            with resp, open(path, mode) as f:
+                while True:
+                    chunk = resp.read(1 << 20)
+                    if not chunk:
+                        break
+                    f.write(chunk)
+            return
+        except Exception as e:  # IncompleteRead, timeout, reset, ...
+            last = e
+            time.sleep(3 * (attempt + 1))
+    raise last
 
 
 def _iter_parquet(dataset, split, config=None, columns=None):
@@ -201,6 +220,8 @@ def adapt_screenplay(voice_cap, structure_cap, genres, voice_cats,
                 asst = val
         if not user or not asst:
             continue
+        if "</think>" in asst:  # keep only the screenplay, drop the reasoning block
+            asst = _THINK.sub("", asst, 1)
         user, asst = F.clean(user), F.clean(asst)
         if not F.is_sfw(user, asst) or not F.quality_ok(asst, max_len=9000):
             continue

@@ -1,30 +1,25 @@
 {
-  "built_at": "2026-07-23 15:54:26",
-  "scale": 1.0,
-  "total_rows": 43230,
-  "train_rows": 42366,
-  "val_rows": 864,
-  "approx_tokens": 31770366,
+  "built_at": "2026-07-23 16:25:55",
+  "total_rows": 44585,
+  "train_rows": 43694,
+  "val_rows": 891,
+  "approx_tokens": 32566329,
   "by_slice": {
+    "writingprompts_twist": 21811,
     "fruit_synth": 7500,
+    "gutenberg_melodrama": 1181,
     "multichar": 12994,
     "dramabench": 925,
-    "writingprompts_twist": 21811
+    "screenplay_voice": 107,
+    "screenplay_structure": 67
   },
   "by_license": {
+    "mit": 22910,
     "ours": 7500,
-    "cc-by-4.0": 12994,
-    "mit": 22736
+    "public-domain": 1181,
+    "cc-by-4.0": 12994
   },
   "format": "chat messages (system/user/assistant) JSONL",
   "policy": "permissive-license + platform-safe (SFW) only",
-  "sources": {
-    "fruit_synth": "ours (synthetic)",
-    "screenplay_voice": "mit",
-    "screenplay_structure": "mit",
-    "multichar": "cc-by-4.0",
-    "dramabench": "mit",
-    "gutenberg_melodrama": "public-domain",
-    "writingprompts_twist": "mit"
-  }
+  "note": "augmented with screenplay (deduped, <think> stripped) + gutenberg melodrama"
 }

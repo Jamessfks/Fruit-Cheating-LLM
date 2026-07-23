@@ -5,11 +5,11 @@
   "seed": 13,
   "slices": {
     "fruit_synth":          { "cap": 7500,  "system": "fruit", "license": "ours (synthetic)" },
-    "screenplay_voice":     { "cap": 18000, "max_scan": 140000, "system": "voice", "license": "mit", "enabled": false, "_note": "disabled: measured only ~174 unique assistants in drama genres (heavily duplicated source)." },
-    "screenplay_structure": { "cap": 5000,  "max_scan": 60000,  "system": "voice", "license": "mit", "enabled": false, "_note": "disabled with screenplay_voice (same duplicated source)." },
+    "screenplay_voice":     { "cap": 8000,  "max_scan": 260000, "system": "voice", "license": "mit", "enabled": true, "_note": "re-enabled with <think> stripped; global dedup caps it to unique rows (source is duplicative, so it contributes only its distinct outputs)." },
+    "screenplay_structure": { "cap": 3000,  "max_scan": 260000, "system": "voice", "license": "mit", "enabled": true },
     "multichar":            { "cap": 13000, "max_scan": 20000,  "system": "voice", "license": "cc-by-4.0" },
     "dramabench":           { "cap": 1100,  "max_scan": 2000,   "system": "voice", "license": "mit" },
-    "gutenberg_melodrama":  { "cap": 1500,  "max_scan": 900,    "system": "voice", "license": "public-domain", "enabled": false, "_note": "disabled for live build: streaming the full 61k-book PD corpus is too heavy on disk/time; re-enable with a curated PD subset." },
+    "gutenberg_melodrama":  { "cap": 3000,  "max_scan": 800,    "system": "voice", "license": "public-domain", "enabled": true, "_note": "re-enabled: pulls dialogue-rich dramatic chunks from ~one 200MB shard's worth of public-domain books (max_scan = books)." },
     "writingprompts_twist": { "cap": 30000, "max_scan": 280000, "system": "voice", "license": "mit" }
   },
   "screenplay_genres_allow": ["drama","romance","psychological","thriller","mystery","crime","noir","historical","biopic","war","horror"],

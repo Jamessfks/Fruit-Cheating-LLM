@@ -42,37 +42,39 @@ baked into `prompts/system_fruit.txt`.
 At inference you use the fruit system prompt; the model applies the dramatic skill it
 learned from the voice tier to the fruit format it learned from the fruit tier.
 
-## The mix (built: 43,230 rows; ~31.8M tokens)
+## The mix (built: 44,585 rows; ~32.6M tokens)
 
-Target was ~50k; the honest permissive+SFW+de-duplicated yield came to **43,230**
-(quality over padding — see the two disabled sources below). Exact live counts are in
+All permissive sources are enabled. Exact live counts are always in
 `data/dataset_card.json`.
 
 Chosen policy: **permissive license only + platform-safe (SFW)**. This deliberately
 excludes copyrighted TV/movie scripts (Cornell, IMSDB, TV transcripts, MELD, etc.),
 which are not safe to train on for a publishable/monetizable product.
 
-| Slice | Source | License | System | ~Target |
+| Slice | Source | License | System | Rows |
 |---|---|---|---|---|
+| `writingprompts_twist` | [euclaise/writingprompts](https://huggingface.co/datasets/euclaise/writingprompts) (twist/drama-filtered, SFW) | MIT | voice | 21,811 |
+| `multichar` | [agentlans/multi-character-dialogue](https://huggingface.co/datasets/agentlans/multi-character-dialogue) | CC-BY-4.0 | voice | 12,994 |
 | `fruit_synth` | synthesized from the Flashloop formula | ours | fruit | 7,500 |
-| `writingprompts_twist` | [euclaise/writingprompts](https://huggingface.co/datasets/euclaise/writingprompts) (twist/drama-filtered, SFW) | MIT | voice | up to 30,000 |
-| `multichar` | [agentlans/multi-character-dialogue](https://huggingface.co/datasets/agentlans/multi-character-dialogue) | CC-BY-4.0 | voice | 13,000 |
-| `dramabench` | [FutureMa/DramaBench](https://huggingface.co/datasets/FutureMa/DramaBench) | MIT | voice | ~925 |
-| `screenplay_*` | [Atum09/screenplay-dataset](https://huggingface.co/datasets/Atum09/screenplay-dataset) | MIT | voice | *disabled* |
-| `gutenberg_melodrama` | [manu/project_gutenberg](https://huggingface.co/datasets/manu/project_gutenberg) | public domain | voice | *disabled* |
+| `gutenberg_melodrama` | [manu/project_gutenberg](https://huggingface.co/datasets/manu/project_gutenberg) (en, dramatic chunks) | public domain | voice | 1,181 |
+| `dramabench` | [FutureMa/DramaBench](https://huggingface.co/datasets/FutureMa/DramaBench) | MIT | voice | 925 |
+| `screenplay_voice` + `screenplay_structure` | [Atum09/screenplay-dataset](https://huggingface.co/datasets/Atum09/screenplay-dataset) (`<think>` stripped) | MIT | voice | 174 |
 
-Two sources were measured and **disabled** during preprocessing:
+**Every slice is 100% unique** (verified) — global dedup guarantees no duplicate assistant
+text enters the set, so each source contributes only its distinct rows.
 
-- `screenplay_*` (Atum09/screenplay-dataset): looked ideal (MIT, ~1M rows, chat-format,
-  genre-tagged) but is **heavily duplicated** — a scan of 45,244 drama rows yielded only
-  **174 unique** assistant outputs. Not worth including. Adapters/config are kept so you
-  can re-enable it if a de-duplicated version appears.
-- `gutenberg_melodrama` (manu/project_gutenberg): the full 61k-book English corpus is too
-  heavy to pull quickly; re-enable with a curated public-domain subset for long-form prose.
+Two notes on the smaller sources:
 
-Because permissive + de-duplicated soap dialogue is scarce, the voice tier leans on
-`writingprompts` (diverse, MIT) and `multichar` (13k unique, CC-BY). Exact per-slice
-counts for the last build are always in `data/dataset_card.json`.
+- `screenplay_*` (Atum09/screenplay-dataset): looks ideal (MIT, ~1M rows, chat-format,
+  genre-tagged) but is **heavily duplicated** — 45,244 drama rows collapse to only **174
+  unique** assistant outputs, so despite its size it contributes 174 clean rows (with the
+  `<think>` reasoning block stripped). Dedup makes including it safe; it simply adds little.
+- `gutenberg_melodrama` (manu/project_gutenberg): dialogue-rich dramatic chunks pulled from
+  ~one 200 MB shard's worth of public-domain books (keyword-filtered for drama). Bump
+  `max_scan` (books) in `config/mix.json` to pull more.
+
+The voice tier is carried mainly by `writingprompts` (diverse, MIT) and `multichar`
+(~13k unique, CC-BY); permissive + de-duplicated soap dialogue is otherwise scarce.
 
 ## Filtering (every row)
 
@@ -108,7 +110,13 @@ src/fruit_generator.py synthetic 6-scene episode generator
 src/adapters.py        per-source -> unified chat rows
 src/filters.py         cleaning / SFW / quality / dedup
 src/build_dataset.py   orchestrator (dedup, shuffle, split, write, data card)
+src/augment_dataset.py add new sources to an existing build without re-downloading
+src/measure.py         measures real *unique* yield per source (used to set caps)
 ```
+
+To add a source to an existing dataset without rebuilding from scratch, enable it in
+`config/mix.json` and run `python src/augment_dataset.py` (reuses the current
+`data/*.jsonl`, dedupes new rows against them, and rewrites a complete dataset).
 
 ## Next phase (not done here)
 
