@@ -1,0 +1,4 @@
+# Data-preprocessing only (no training deps here — LoRA/TRL come in a later phase).
+datasets>=2.19.0
+huggingface_hub>=0.23.0
+tqdm>=4.66.0

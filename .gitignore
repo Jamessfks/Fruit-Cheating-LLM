@@ -1,0 +1,15 @@
+# Large generated data — publish the big files to the HF Hub / Git LFS, not GitHub.
+data/slices/
+data/*.jsonl
+data/*.jsonl.gz
+!data/samples/**
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# HF / caches
+.cache/
+hf_cache/

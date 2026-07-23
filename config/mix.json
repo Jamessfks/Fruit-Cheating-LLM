@@ -1,0 +1,18 @@
+{
+  "_comment": "Data-preprocessing config for the Fruit-Cheating-LLM LoRA SFT dataset. Permissive-license + platform-safe (SFW) only. Two-tier: 'fruit' rows use the fruit system prompt; all other ('voice') rows teach general dramatic writing + twists. Caps are targets; max_scan bounds how many source rows are streamed to find qualifying rows.",
+  "target_total": 50000,
+  "train_val_split": 0.98,
+  "seed": 13,
+  "slices": {
+    "fruit_synth":          { "cap": 7500,  "system": "fruit", "license": "ours (synthetic)" },
+    "screenplay_voice":     { "cap": 18000, "max_scan": 140000, "system": "voice", "license": "mit", "enabled": false, "_note": "disabled: measured only ~174 unique assistants in drama genres (heavily duplicated source)." },
+    "screenplay_structure": { "cap": 5000,  "max_scan": 60000,  "system": "voice", "license": "mit", "enabled": false, "_note": "disabled with screenplay_voice (same duplicated source)." },
+    "multichar":            { "cap": 13000, "max_scan": 20000,  "system": "voice", "license": "cc-by-4.0" },
+    "dramabench":           { "cap": 1100,  "max_scan": 2000,   "system": "voice", "license": "mit" },
+    "gutenberg_melodrama":  { "cap": 1500,  "max_scan": 900,    "system": "voice", "license": "public-domain", "enabled": false, "_note": "disabled for live build: streaming the full 61k-book PD corpus is too heavy on disk/time; re-enable with a curated PD subset." },
+    "writingprompts_twist": { "cap": 30000, "max_scan": 280000, "system": "voice", "license": "mit" }
+  },
+  "screenplay_genres_allow": ["drama","romance","psychological","thriller","mystery","crime","noir","historical","biopic","war","horror"],
+  "screenplay_voice_categories": ["dialogue_craft","ensemble_scene","scene_writing","monologue","exposition_scene","closing_image","opening_image","character_generation","transition_scene"],
+  "screenplay_structure_categories": ["storyline_generation","structure_analysis","act_break","series_bible","pitch_document","tv_pilot","script_coverage"]
+}
