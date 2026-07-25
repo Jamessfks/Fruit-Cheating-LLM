@@ -70,7 +70,7 @@
 
   <div class="fd-sec-title">🎬 Generate live from your fine-tuned model</div>
   <div class="fd-opts">
-    <label>Model API <input type="text" id="fdEndpoint" value="http://spark-2e6c:8000/v1/chat/completions" style="min-width:300px"></label>
+    <label>Model API <input type="text" id="fdEndpoint" value="http://100.69.132.101:8000/v1/chat/completions" style="min-width:300px"></label>
     <label>Model <input type="text" id="fdModel" value="fruit" style="width:80px"></label>
     <button class="fd-btn" id="fdRun">▶ Generate episode</button>
     <span class="fd-count" id="fdStatus"></span>
@@ -202,7 +202,7 @@ document.getElementById('fdRun').onclick=async ()=>{
   st.textContent='generating…'; ep.textContent='';
   try{
     const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model,messages,temperature:0.8,top_p:0.9,max_tokens:800})});
+      body:JSON.stringify({model,messages,temperature:0.8,top_p:0.9,max_tokens:800,chat_template_kwargs:{enable_thinking:false}})});
     if(!r.ok){ st.textContent='HTTP '+r.status; ep.textContent=await r.text(); return; }
     const j=await r.json();
     ep.textContent=(j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content)||JSON.stringify(j,null,2);
