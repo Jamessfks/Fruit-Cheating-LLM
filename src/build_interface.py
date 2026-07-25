@@ -104,6 +104,15 @@ BODY = r"""
     <button class="fd-btn" id="fdGen">✨ Generate prompt</button>
   </div>
 
+  <div class="fd-sec-title">🎬 Generate live from your fine-tuned model</div>
+  <div class="fd-opts">
+    <label>Model API <input type="text" id="fdEndpoint" value="http://spark-2e6c:8000/v1/chat/completions" style="min-width:300px"></label>
+    <label>Model <input type="text" id="fdModel" value="fruit" style="width:80px"></label>
+    <button class="fd-btn" id="fdRun">▶ Generate episode</button>
+    <span class="fd-count" id="fdStatus"></span>
+  </div>
+  <div class="fd-out" id="fdEpisode">Your generated episode will appear here (needs the vLLM server running on the Spark).</div>
+
   <div class="fd-sec-title">📝 Prompt for the LLM
     <button class="fd-btn ghost" id="fdCopy" style="margin-left:auto">Copy prompt</button>
     <button class="fd-btn ghost" id="fdCopyJson">Copy JSON</button>
@@ -219,6 +228,29 @@ document.getElementById('fdClear').onclick=()=>{sel.clear();renderGrid();renderC
 document.getElementById('fdGen').onclick=()=>{ const a=assemble(); document.getElementById('fdOut').textContent=a.text; window._fdA=a; };
 document.getElementById('fdCopy').onclick=()=>{ const a=window._fdA||assemble(); copy(a.text); };
 document.getElementById('fdCopyJson').onclick=()=>{ const a=window._fdA||assemble(); if(a.json) copy(a.json); };
+document.getElementById('fdRun').onclick=async ()=>{
+  const a=assemble();
+  const ep=document.getElementById('fdEpisode'), st=document.getElementById('fdStatus');
+  if(!a.json){ ep.textContent=a.text; return; }
+  const url=document.getElementById('fdEndpoint').value.trim();
+  const model=document.getElementById('fdModel').value.trim()||'fruit';
+  const messages=JSON.parse(a.json).messages;
+  st.textContent='generating…'; ep.textContent='';
+  try{
+    const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model,messages,temperature:0.8,top_p:0.9,max_tokens:800})});
+    if(!r.ok){ st.textContent='HTTP '+r.status; ep.textContent=await r.text(); return; }
+    const j=await r.json();
+    ep.textContent=(j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content)||JSON.stringify(j,null,2);
+    st.textContent='done ✓';
+  }catch(e){
+    st.textContent='connection error';
+    ep.textContent='Request failed: '+e.message+'\n\nChecklist:\n'
+      +'  • vLLM running on the Spark (:8000) with --enable-lora\n'
+      +'  • endpoint reachable from this machine (default http://spark-2e6c:8000)\n'
+      +'  • vLLM started with --allowed-origins \'["*"]\' (CORS)';
+  }
+};
 document.getElementById('fdExample').onclick=()=>{
   sel.clear();
   sel.set('Peach',{gender:'Female',stage:'prime',role:'Yoga instructor',disp:'Hot and arrogant',char:'Temptress / Seducer',note:'Runs the retreat; everyone wants her approval'});
