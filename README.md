@@ -11,6 +11,7 @@ Dataset → LoRA fine-tune → served API → point-and-click story builder. The
 [![Dataset](https://img.shields.io/badge/dataset-44%2C585%20rows-success)](#-the-dataset)
 [![Licensing](https://img.shields.io/badge/data-permissive%20only-brightgreen)](#licensing-policy)
 [![Characters](https://img.shields.io/badge/fruit%20bible-64%20characters-orange)](#-the-fruit-bible)
+[![License](https://img.shields.io/badge/license-MIT-yellow)](LICENSE)
 
 </div>
 
@@ -331,7 +332,7 @@ The 133 MB training JSONL and model weights are **not** committed — rebuild wi
 
 ## ⚖️ License & use
 
-Code in this repo: MIT. The dataset is built exclusively from MIT / CC-BY-4.0 / public-domain sources plus original synthetic data, and is SFW-filtered — see [`data/dataset_card.json`](data/dataset_card.json) for the per-license breakdown of any build.
+Code in this repo is **MIT** — see [`LICENSE`](LICENSE). The dataset is built exclusively from MIT / CC-BY-4.0 / public-domain sources plus original synthetic data, and is SFW-filtered — see [`data/dataset_card.json`](data/dataset_card.json) for the per-license breakdown of any build.
 
 Attribution obligations flow through: the `multichar` slice is **CC-BY-4.0**, so credit [agentlans/multi-character-dialogue](https://huggingface.co/datasets/agentlans/multi-character-dialogue) if you redistribute the dataset or a model trained on it.
 
