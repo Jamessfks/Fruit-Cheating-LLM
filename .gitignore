@@ -18,3 +18,7 @@ pq_tmp/
 
 # local preview config
 .claude/
+
+# macOS / Office cruft
+.DS_Store
+~$*
