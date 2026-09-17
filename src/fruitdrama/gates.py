@@ -146,6 +146,12 @@ def check_story(
     m = C.LEAKAGE_RE.search(text)
     if m:
         r.fail("G2", f"format leakage: {m.group(0)[:40]!r}")
+    for para in paras[1:]:
+        if ("\n" not in para
+                and T.word_count(para) <= C.MID_HEADER_MAX_WORDS
+                and not para.rstrip().endswith((".", "!", "?", "…", '"', "”", "'"))):
+            r.fail("G2", f"mid-story section header: {para[:40]!r}")
+            break
     n_ast = text.count("*")
     r.stats["asterisks"] = n_ast
     if n_ast > C.MAX_ASTERISKS:
@@ -225,11 +231,17 @@ def check_story(
     tail_end = tail.rstrip().rstrip("\"'”’)»")
     if C.RESOLVED_ENDING_RE.search(tail):
         r.fail("G10", "resolved ending, no cliffhanger")
-    elif not (
-        tail_end.endswith(("?", "…"))
-        or C.REVERSAL_RE.search(tail)
-    ):
-        r.fail("G10", "ending lands no reveal or hook")
+    else:
+        last = sents[-1] if sents else tail
+        hook = (
+            tail_end.endswith(("?", "…"))
+            or C.REVERSAL_RE.search(tail)
+            # A short, punchy, unresolved closing line is a cliffhanger in its
+            # own right; requiring "?" or a lexicon hit rejected real hooks.
+            or T.word_count(last) <= 14
+        )
+        if not hook:
+            r.fail("G10", "ending lands no reveal or hook")
 
     # G11 -- premise fidelity: a fruit the user named must actually be a lead.
     mentions = character_mentions(text)

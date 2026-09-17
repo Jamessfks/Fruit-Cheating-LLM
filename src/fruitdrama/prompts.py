@@ -37,8 +37,13 @@ def story_system() -> str:
         Given any premise, write ONE complete short story.
 
         FORM
-        - A short title line, then the story in paragraphs.
-        - {lo}-{hi} words total. Aim for about {C.WORD_TARGET}. That is a 2-3 minute read.
+        - Exactly ONE title line at the very top, then unbroken prose paragraphs.
+        - After that title, nothing that looks like a heading ever again: no
+          second title, no date lines, no chapter or part labels, no scene
+          labels, no "Later"/"At the hospital" signposts, no NARRATION: or
+          VISUAL: labels, no camera or stage directions in parentheses.
+        - {lo}-{hi} words total. Aim for about {C.WORD_TARGET} and do not exceed {hi}.
+          That is a 2-3 minute read.
         - Plain prose only. No markdown of any kind: no asterisks, no bold, no
           italics, no headers, no bullets, no numbered lists.
         - Never scene headings, never NARRATION: or VISUAL: labels, never
@@ -51,7 +56,8 @@ def story_system() -> str:
           how they bruise, ripen, spoil, hold a grudge.
 
         EMOJI -- read this carefully
-        - Use {emin} to {emax} emoji in the story. Count them. Fewer than {emin} is wrong.
+        - Use {emin} to {emax} emoji in the story. Count them before you finish.
+          A story with fewer than {emin} emoji is wrong and must be rewritten.
         - Put them INSIDE sentences, attached to the noun or feeling they colour.
         - Never two emoji in a row. Never one floating alone between sentences.
         - Do not end every sentence with one. At most half should sit next to a

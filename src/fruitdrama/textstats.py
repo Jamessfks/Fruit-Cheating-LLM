@@ -284,7 +284,10 @@ def emoji_position_stats(text: str) -> tuple[int, float]:
             else:
                 break
         before = before.rstrip(quotes)
-        if before == "" or before[-1] in terminators:
+        if before == "":
+            # Position 0: this is the title glyph, not a floating emoji.
+            pass
+        elif before[-1] in terminators:
             floating += 1
 
         after = text[end:].lstrip(" \t")

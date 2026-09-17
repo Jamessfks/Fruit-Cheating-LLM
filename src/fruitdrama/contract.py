@@ -29,8 +29,8 @@ WORD_GATE_MAX = 780
 # demanded 21-28 emoji for a 600-word story. The hand-authored seed sits at 2.9
 # per 100 words and reads right; per-100-words is stable against sentence-length
 # style, per-sentence is not.
-EMOJI_PER_100W_MIN = 1.8
-EMOJI_PER_100W_MAX = 5.0
+EMOJI_PER_100W_MIN = 1.2   # ~7-8 emoji per 620 words; calibrated by reading
+EMOJI_PER_100W_MAX = 5.0   # generations, not by copying the gold seeds
 EMOJI_PER_SENTENCE_MIN = 0.33          # retained for reporting only
 EMOJI_PER_SENTENCE_MAX = 1.00
 MAX_EMOJI_PER_SENTENCE = 2             # 3+ in one sentence reads as spam
@@ -72,6 +72,8 @@ MAX_NGRAM_REPEAT_N = 8                 # no repeated 8-gram within one story
 MAX_SENTENCE_OVERLAP = 0.80            # near-duplicate sentences
 MIN_PROSE_ASCII = 0.95                 # computed AFTER emoji+typography strip
 MAX_ASTERISKS = 4                      # the teacher emits 26-42 per story
+MID_HEADER_MAX_WORDS = 8               # a short unpunctuated mid-story line is
+                                       # a section header, not prose
 MINHASH_REJECT_JACCARD = 0.50          # cross-story near-duplicate
 MAX_SHARED_OPENING = 3                 # stories sharing a 6-gram opening
 MAX_SHARED_CLOSING = 3
