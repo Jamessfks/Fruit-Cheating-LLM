@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+# Mac-side control for the Fruit Drama stack.
+#
+# Replaces start-fruit-drama.command, whose three assumptions are all dead: the
+# ssh alias `james` (now spark-2e6c), the tmux session `vs`, and opening
+# interface/index.html from disk (the app is now served by the gateway).
+#
+# Host resolution never hardcodes an address. v1 baked a Tailscale IP into the
+# generated HTML and it went stale; the fix is a resolver, not a convention.
+set -uo pipefail
+
+SPARK="${SPARK_HOST:-spark-2e6c}"
+SSH=(ssh -o BatchMode=yes -o ConnectTimeout=8 -o ServerAliveInterval=15 "$SPARK")
+GATEWAY_PORT="${GATEWAY_PORT:-8080}"
+REMOTE_ROOT="\$HOME/fruit"
+
+usage() {
+  cat <<USAGE
+usage: fruit <command>
+
+  status     one-screen health of the box, models and jobs
+  corpus     progress of the corpus generation run
+  logs <n>   tail the corpus log (default 30 lines)
+  up         start model + gateway, wait for ready, open the app
+  down       stop gateway and model (frees the GPU)
+  sync       push local code to the Spark
+  eval       run the ship-gate eval against the serving endpoint
+  shell      ssh into the Spark at the project root
+USAGE
+}
+
+case "${1:-}" in
+status)
+  "${SSH[@]}" bash -s <<'REMOTE'
+    echo "=== gpu ==="
+    nvidia-smi --query-gpu=name,utilization.gpu,temperature.gpu --format=csv,noheader
+    echo "=== memory ==="; free -g | sed -n 2p
+    echo "=== disk ==="; df -h / | tail -1
+    echo "=== models on disk ==="
+    find "$HOME/fruit/models/gguf" -name "*.gguf" -printf "%10.1f GB  %f\n" 2>/dev/null |
+      awk '{printf "%8.1f GB  %s\n", $1/1073741824*1073741824/1073741824, $3}' 2>/dev/null ||
+      find "$HOME/fruit/models/gguf" -name "*.gguf" -exec du -h {} + 2>/dev/null
+    echo "=== served model ==="
+    curl -s localhost:8000/v1/models 2>/dev/null |
+      python3 -c 'import json,sys; print([m["id"] for m in json.load(sys.stdin)["data"]])' 2>/dev/null ||
+      echo "no model server on :8000"
+    echo "=== tmux ==="; tmux ls 2>/dev/null || echo "no sessions"
+REMOTE
+  ;;
+corpus)
+  "${SSH[@]}" bash -s <<'REMOTE'
+    R="$HOME/fruit/run1"
+    acc=$(wc -l < "$R/accepted.jsonl" 2>/dev/null || echo 0)
+    raw=$(wc -l < "$R/raw.jsonl" 2>/dev/null || echo 0)
+    rej=$(wc -l < "$R/rejected.jsonl" 2>/dev/null || echo 0)
+    echo "generated $raw   accepted $acc   rejected $rej"
+    [ "$raw" -gt 0 ] && echo "accept rate $(( 100 * acc / raw ))%"
+    echo
+    grep -E "^\[" "$HOME/fruit/logs/corpus.log" 2>/dev/null | tail -3
+    grep -E "^        (gates|judge)" "$HOME/fruit/logs/corpus.log" 2>/dev/null | tail -2
+REMOTE
+  ;;
+logs)  "${SSH[@]}" "tail -${2:-30} \$HOME/fruit/logs/corpus.log" ;;
+sync)
+  rsync -az --delete --exclude '__pycache__' --exclude '*.pyc' \
+    src/fruitdrama "$SPARK:~/fruit/app/src/"
+  rsync -az scripts config serve eval training "$SPARK:~/fruit/app/"
+  rsync -az data/gold data/fruit_bible.json data/eval_holdout.json "$SPARK:~/fruit/app/data/"
+  echo "synced"
+  ;;
+up)
+  "${SSH[@]}" "tmux has-session -t gateway 2>/dev/null || tmux new-session -d -s gateway \
+    'cd ~/fruit/app && FRUIT_UPSTREAM=http://127.0.0.1:8000 \
+     ~/fruit/venv/bin/uvicorn serve.gateway.app:app --host 0.0.0.0 --port $GATEWAY_PORT \
+     2>&1 | tee ~/fruit/logs/gateway.log'"
+  printf "waiting for gateway"
+  for _ in $(seq 1 60); do
+    if "${SSH[@]}" "curl -sf localhost:$GATEWAY_PORT/healthz >/dev/null"; then echo " ready"; break; fi
+    printf "."; sleep 2
+  done
+  open "http://$SPARK:$GATEWAY_PORT/"
+  ;;
+down) "${SSH[@]}" "tmux kill-session -t gateway 2>/dev/null; tmux kill-session -t model 2>/dev/null; echo stopped" ;;
+eval)
+  "${SSH[@]}" "cd ~/fruit/app && ~/fruit/venv/bin/python eval/run_eval.py \
+    --endpoint http://127.0.0.1:8000 --model \${FRUIT_MODEL:-fruit} --tag \${TAG:-manual} --n 120"
+  ;;
+shell) exec ssh "$SPARK" -t "cd ~/fruit/app && exec bash -l" ;;
+*) usage; exit 1 ;;
+esac

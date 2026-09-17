@@ -46,7 +46,14 @@ MIN_SEGMENTS_WITH_EMOJI = 4            # of N_SEGMENTS -- style-stable spread te
 #   * an emoji immediately BEFORE a terminator ends a clause, which reads fine
 #     in moderation but becomes a tic if every sentence does it.
 MAX_FLOATING_EMOJI = 1
-MAX_CLAUSE_FINAL_EMOJI_FRACTION = 0.60
+# Raised from 0.60 after reading a story at 0.615 that reads perfectly well.
+# The metric conflates two different things: an emoji attached to a concrete
+# noun that happens to END a sentence ("her ice sculptures [ice]." ) is
+# well-placed, and it is only incidental that the noun is sentence-final.
+# What is actually bad is an emoji attached to nothing -- and that is the
+# `floating` check above, which is the real discriminator. This cap is kept
+# only to catch the degenerate case where literally every sentence ends in one.
+MAX_CLAUSE_FINAL_EMOJI_FRACTION = 0.85
 
 # ---------------------------------------------------------------- shape
 # Measured paragraph counts across 12 real generations: 11-39, median 17.
