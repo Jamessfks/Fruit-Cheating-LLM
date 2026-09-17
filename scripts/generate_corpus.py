@@ -40,15 +40,27 @@ from fruitdrama.judge import score_story       # noqa: E402
 from fruitdrama.premises import PremiseEngine  # noqa: E402
 
 
-def fewshot_pool(paths: list[pathlib.Path]) -> list[dict]:
-    pool = []
+def fewshot_pool(paths: list[pathlib.Path], cap: int = 240,
+                 rng: random.Random | None = None) -> list[dict]:
+    """Gold seeds plus a bounded sample of accepted rows.
+
+    Capped deliberately: re-reading a growing accepted.jsonl after every wave
+    would be ~156 reads of a 30 MB file over a 10k-row run, and a larger pool
+    buys nothing once there is enough variety to rotate through.
+    """
+    pool: list[dict] = []
     for p in paths:
-        if p.exists():
-            for line in p.read_text().splitlines():
-                if line.strip():
-                    rec = json.loads(line)
-                    if rec.get("story") and rec.get("premise"):
-                        pool.append(rec)
+        if not p.exists():
+            continue
+        rows = []
+        for line in p.read_text().splitlines():
+            if line.strip():
+                rec = json.loads(line)
+                if rec.get("story") and rec.get("premise"):
+                    rows.append(rec)
+        if len(rows) > cap:
+            rows = (rng or random).sample(rows, cap)
+        pool.extend(rows)
     return pool
 
 
@@ -253,9 +265,10 @@ def main() -> int:
             handle(by_id[pid], text)
             if stats["seen"] % args.stats_every == 0:
                 report()
-        # Refresh the few-shot pool with newly accepted, judged stories.
-        pool = fewshot_pool([root / "data" / "gold" / "seeds.jsonl",
-                             out / "accepted.jsonl"])
+        # Refresh the few-shot pool occasionally, not every wave.
+        if (idx // wave) % 10 == 0:
+            pool = fewshot_pool([root / "data" / "gold" / "seeds.jsonl",
+                                 out / "accepted.jsonl"], rng=rng)
 
     raw_w.close(); acc_w.close(); rej_w.close()
     report()

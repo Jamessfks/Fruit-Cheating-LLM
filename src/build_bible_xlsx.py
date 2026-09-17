@@ -9,6 +9,18 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
+import json as _json
+import pathlib as _pathlib
+
+# Single source of truth; these lists were previously duplicated verbatim
+# between this file and the deleted src/build_interface.py.
+_TAX = _json.loads((_pathlib.Path(__file__).resolve().parents[1]
+                    / "data" / "taxonomy.json").read_text())
+ROLES = _TAX["roles"]
+DISPOSITIONS = _TAX["dispositions"]
+CHARACTERS = _TAX["characters"]
+
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA = json.load(open(os.path.join(ROOT, "data", "fruit_bible.json"), encoding="utf-8"))
 OUT_DIR = os.path.join(ROOT, "deliverables")
@@ -142,62 +154,6 @@ kv(ws2, 3, rows)
 # ------------------------------------------------- Sheet 3: Roles & Dispositions
 ws3 = wb.create_sheet("Roles & Dispositions")
 ws3.sheet_view.showGridLines = False
-ROLES = ["Yoga instructor", "Gym bro / trainer", "CEO / mogul", "Housewife / househusband",
-         "Detective", "Doctor / surgeon", "Lawyer", "Chef", "Influencer", "Bartender",
-         "Politician", "Priest / pastor", "Teacher", "Nurse", "Model", "Retired pro athlete",
-         "Mob boss", "Heir / heiress", "Maid / butler", "Bodyguard", "Artist", "Pop star",
-         "Nanny", "Real-estate mogul", "Wedding planner", "Pilot", "Farmer", "Fortune teller",
-         "Bride", "Groom", "Mistress", "Mother-in-law", "The ex", "Long-lost twin",
-         "Con artist", "Socialite", "Personal trainer", "Bouncer", "Barista", "Fashion designer"]
-DISPOSITIONS = ["Hot and arrogant", "Shy and sweet", "Cold and calculating", "Warm but naive",
-                "Secretly rich", "Secretly broke", "Vengeful", "Heartbroken", "Ambitious",
-                "Jealous", "Loyal to a fault", "Two-faced", "Seductive", "Insecure", "Ruthless",
-                "Protective", "Manipulative", "Righteous", "Reckless", "Hiding a secret",
-                "Newly pregnant", "Recently betrayed", "Power-hungry", "Desperate for approval",
-                "Cool and detached", "Disciplined", "Haunted by the past", "Overconfident"]
-CHARACTERS = ["Protagonist", "Antagonist / Villain", "Temptress / Seducer", "Innocent victim",
-              "Matriarch / Patriarch", "The Heir", "The Betrayer", "The Peacemaker",
-              "The Schemer", "Comic relief", "The Wildcard", "The Mentor", "The Outsider",
-              "The Golden child", "The Black sheep", "The Gossip", "The Enforcer",
-              "The Martyr", "The Trophy", "The Underdog"]
-title_block(ws3, "Selectable Roles · Dispositions · Dramatic Characters (feed the interface)", span=3, size=12)
-hdrs = ["Role (occupation)", "Disposition (attitude)", "Dramatic Character (function)"]
-for c, h in enumerate(hdrs, start=1):
-    cell = ws3.cell(row=2, column=c, value=h)
-    cell.fill = PatternFill("solid", fgColor=PLUM)
-    cell.font = Font(name=FONT, size=10, bold=True, color=WHITE)
-    cell.alignment = Alignment(horizontal="left", vertical="center")
-    ws3.column_dimensions[get_column_letter(c)].width = 32
-for i in range(max(len(ROLES), len(DISPOSITIONS), len(CHARACTERS))):
-    for c, lst in enumerate([ROLES, DISPOSITIONS, CHARACTERS], start=1):
-        v = lst[i] if i < len(lst) else ""
-        cell = ws3.cell(row=i + 3, column=c, value=v)
-        cell.font = Font(name=FONT, size=10)
-        if (i % 2):
-            cell.fill = PatternFill("solid", fgColor=PLUM_LT)
-ws3.freeze_panes = "A3"
-
-# ------------------------------------------------- Sheet 4: Story Builder (example)
-ws4 = wb.create_sheet("Story Builder (example)")
-ws4.sheet_view.showGridLines = False
-title_block(ws4, "Story Builder — pick 2-5 fruits, fill the row, add context. The LLM does the rest.", span=9, size=11)
-sb_hdr = ["Slot", "Fruit", "Emoji", "Gender", "Life Stage", "Role", "Disposition",
-          "Dramatic Character", "Custom note"]
-widths = [6, 14, 7, 12, 12, 20, 22, 22, 34]
-for c, (h, w) in enumerate(zip(sb_hdr, widths), start=1):
-    cell = ws4.cell(row=2, column=c, value=h)
-    cell.fill = PatternFill("solid", fgColor=PLUM)
-    cell.font = Font(name=FONT, size=10, bold=True, color=WHITE)
-    cell.alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
-    ws4.column_dimensions[get_column_letter(c)].width = w
-example = [
-    ["Char 1", "Peach", "🍑", "Female", "Prime", "Yoga instructor", "Hot and arrogant",
-     "Temptress / Seducer", "Runs the retreat; everyone wants her approval"],
-    ["Char 2", "Banana", "🍌", "Male", "Prime", "Gym bro / trainer", "Disciplined; secretly rich",
-     "The Golden child", "Hides old family money behind protein shakes"],
-    ["Char 3", "Watermelon", "🍉", "Male", "Ripening", "Retired pro athlete", "Haunted by the past",
-     "The Underdog", "'Fat guy' who was secretly a hidden pro athlete"],
-]
 for i, row in enumerate(example):
     for c, v in enumerate(row, start=1):
         cell = ws4.cell(row=i + 3, column=c, value=v)
