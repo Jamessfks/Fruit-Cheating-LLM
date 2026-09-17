@@ -65,6 +65,24 @@ def pick_fewshots(pool: list[dict], want_arch: str, rng: random.Random, k: int =
     return rng.sample(other, min(k, len(other)))
 
 
+def block_fewshots(pool: list[dict], block: int, k: int, seed: int = 0):
+    """Few-shots held FIXED within a block of requests, rotated between blocks.
+
+    Prefill is expensive here: measured prompt processing is 311-577 tok/s, and
+    two exemplars plus the system prompt is ~2,000 tokens, i.e. 4-6s per request
+    before a single token is generated. Holding the exemplars fixed makes
+    system+exemplars a shared prefix that llama.cpp's slot prefix cache serves
+    almost for free, so only the ~500-token brief needs processing.
+
+    Rotating between blocks preserves style variety across the corpus; keeping
+    them fixed *within* a block is what buys the cache hit.
+    """
+    if not pool:
+        return []
+    r = random.Random(seed * 1000003 + block)
+    return r.sample(pool, min(k, len(pool)))
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--target", type=int, default=15000)
@@ -77,8 +95,10 @@ def main() -> int:
     ap.add_argument("--fewshot", type=int, default=2)
     ap.add_argument("--stats-every", type=int, default=50)
     ap.add_argument("--seed", type=int, default=13)
-    ap.add_argument("--max-attempts-multiple", type=float, default=2.2,
+    ap.add_argument("--max-attempts-multiple", type=float, default=3.0,
                     help="premises to draw per accepted row")
+    ap.add_argument("--fewshot-block", type=int, default=250,
+                    help="requests per fixed few-shot block (prefix-cache win)")
     args = ap.parse_args()
 
     out = pathlib.Path(args.out)
@@ -214,11 +234,10 @@ def main() -> int:
     while stats["accepted"] < args.target and idx < len(premises):
         batch = premises[idx:idx + wave]
         idx += wave
+        block = idx // max(1, args.fewshot_block)
+        shots = block_fewshots(pool, block, args.fewshot, args.seed)
         tasks = [
-            (p.id,
-             P.teacher_messages(p.user_prompt, p.brief,
-                                pick_fewshots(pool, p.facets.get("twist"), rng, args.fewshot)),
-             {})
+            (p.id, P.teacher_messages(p.user_prompt, p.brief, shots), {})
             for p in batch
         ]
         by_id = {p.id: p for p in batch}
