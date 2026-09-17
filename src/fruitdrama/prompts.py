@@ -32,7 +32,11 @@ def story_system() -> str:
     ask, ask_max = C.PROMPT_WORD_TARGET, C.PROMPT_WORD_MAX
     # Floor must hold even for the longest story the gate will accept; ceiling
     # is computed at the length we ask for, so a short story cannot exceed it.
-    emin = math.ceil(C.EMOJI_PER_100W_MIN * C.WORD_GATE_MAX / 100) + 2
+    # Floor stays derived from the longest acceptable story so the ask is always
+    # satisfiable; the target is set well above it because the model
+    # consistently lands below whatever number it is given.
+    emin = math.ceil(C.EMOJI_PER_100W_MIN * C.WORD_GATE_MAX / 100) + 4
+    etarget = C.EMOJI_PROMPT_TARGET
     emax = int(C.EMOJI_PER_100W_MAX * C.WORD_MIN / 100) - 1
     return textwrap.dedent(f"""\
         You write short fruit-drama stories: campy, vivid telenovela tales where
@@ -59,8 +63,8 @@ def story_system() -> str:
           how they bruise, ripen, spoil, hold a grudge.
 
         EMOJI -- read this carefully
-        - Use {emin} to {emax} emoji in the story. Count them before you finish.
-          A story with fewer than {emin} emoji is wrong and must be rewritten.
+        - Use about {etarget} emoji. Count them before you finish. Fewer than
+          {emin} is wrong and the story must be rewritten with more.
         - Put them INSIDE sentences, attached to the noun or feeling they colour.
         - Never two emoji in a row. Never one floating alone between sentences.
         - Do not end every sentence with one. At most half should sit next to a

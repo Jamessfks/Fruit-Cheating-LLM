@@ -39,6 +39,12 @@ PROMPT_WORD_MAX = 650
 # style, per-sentence is not.
 EMOJI_PER_100W_MIN = 1.2   # ~7-8 emoji per 620 words; calibrated by reading
 EMOJI_PER_100W_MAX = 5.0   # generations, not by copying the gold seeds
+# Asked for, not enforced -- the same distinction as PROMPT_WORD_TARGET.
+# Measured: an ask of "12 to 24" produced a median of 10, with the low tail at 5
+# driving 189 of 500 rejections. The model anchors below any range it is given,
+# so the ask is a single number set well above the gate's requirement.
+EMOJI_PROMPT_TARGET = 22
+
 EMOJI_PER_SENTENCE_MIN = 0.33          # retained for reporting only
 EMOJI_PER_SENTENCE_MAX = 1.00
 MAX_EMOJI_PER_SENTENCE = 2             # 3+ in one sentence reads as spam
