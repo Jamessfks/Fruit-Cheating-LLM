@@ -147,9 +147,12 @@ def check_story(
     if m:
         r.fail("G2", f"format leakage: {m.group(0)[:40]!r}")
     for para in paras[1:]:
+        # Strip trailing emoji and quotes first: a short line of dialogue ending
+        # in a glyph is prose, not a heading.
+        tail = T.strip_emoji(para).rstrip().rstrip("\"'”’)»")
         if ("\n" not in para
                 and T.word_count(para) <= C.MID_HEADER_MAX_WORDS
-                and not para.rstrip().endswith((".", "!", "?", "…", '"', "”", "'"))):
+                and not tail.endswith((".", "!", "?", "…", ",", ";", ":", "—", "-"))):
             r.fail("G2", f"mid-story section header: {para[:40]!r}")
             break
     n_ast = text.count("*")

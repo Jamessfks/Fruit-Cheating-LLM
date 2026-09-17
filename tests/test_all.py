@@ -109,6 +109,24 @@ check("G10" in check_story(
 check("G7" in check_story((base.split("\n\n")[1] + "\n\n") * 8).failures,
       "repetition rejected")
 
+section("mid-story header check: precise, not trigger-happy")
+# 124 of 133 G2 failures in the first corpus batch were this check firing, and
+# reading them showed it was mostly RIGHT -- the model really was emitting diary
+# dates and SCENE labels -- with two genuine false positives.
+_tail = "\n\nShe waited for an answer that never came."
+for para, should_flag, label in [
+    ("\U0001F7E2 August 21st", True, "diary date header"),
+    ("\U0001F34ASCENE 2: The Photograph", True, "scene label"),
+    ("(Three hours later)", True, "scene transition"),
+    ("Vito Grape: (silence)", True, "screenplay speaker line"),
+    ("\u201cI don\u2019t understand.\u201d \U0001F92F", False, "dialogue ending in an emoji"),
+    ("Yours, in your decay,", False, "letter salutation ending in a comma"),
+]:
+    r = check_story(gold[0]["story"] + "\n\n" + para + _tail)
+    flagged = any("header" in r.detail.get(g, "") for g in r.failures)
+    check(flagged == should_flag,
+          f"{'flags' if should_flag else 'allows'} {label}: {para[:32]!r}")
+
 section("title splitting and character counting")
 title, body = split_title("\U0001F353 The Receipt\n\nShe wept.")
 check(title is not None and "Receipt" in title, "title extracted")
