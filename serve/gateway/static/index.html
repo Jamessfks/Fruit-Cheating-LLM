@@ -193,7 +193,7 @@ async function run() {
         const dm = f.match(/^data: (.+)$/m);
         if (!ev || !dm) continue;
         const d = JSON.parse(dm[1]);
-        if (ev === "delta") { fullText += d.t; push(d.t); }
+        if (ev === "delta") { if (!fullText) say(""); fullText += d.t; push(d.t); }
         else if (ev === "done") {
           meter.textContent = `${d.words} words · ${d.read_min} min read · ${d.emoji} emoji`;
         } else if (ev === "policy") say(d.message || "That premise did not work. Try another.");

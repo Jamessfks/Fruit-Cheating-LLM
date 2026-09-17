@@ -44,6 +44,10 @@ UPSTREAM = os.environ.get("FRUIT_UPSTREAM", "http://127.0.0.1:8000")
 MODEL = os.environ.get("FRUIT_MODEL", "fruit")
 SLOTS = int(os.environ.get("FRUIT_SLOTS", "4"))
 RATE_PER_MIN = int(os.environ.get("FRUIT_RATE_PER_MIN", "6"))
+# Generous, because it covers queueing behind other in-flight requests, not
+# just generation. A story itself streams its first token in well under a second
+# on an idle box.
+FIRST_TOKEN_TIMEOUT = float(os.environ.get("FRUIT_FIRST_TOKEN_TIMEOUT", "180"))
 STATIC = pathlib.Path(__file__).parent / "static"
 
 BIBLE = json.loads((_ROOT / "data" / "fruit_bible.json").read_text())
@@ -147,6 +151,19 @@ def build_messages(req: StoryRequest) -> list[dict]:
             {"role": "user", "content": user}]
 
 
+async def upstream_busy() -> bool:
+    """True when every model-server slot is already generating."""
+    try:
+        async with httpx.AsyncClient(timeout=2) as c:
+            r = await c.get(f"{UPSTREAM}/slots")
+        if r.status_code == 200:
+            slots = r.json()
+            return bool(slots) and all(s.get("is_processing") for s in slots)
+    except Exception:
+        pass
+    return False
+
+
 def sse(event: str, data: dict) -> bytes:
     return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n".encode()
 
@@ -225,6 +242,9 @@ async def story(req: StoryRequest, request: Request):
         yield sse("meta", {"story_id": story_id, "model": MODEL,
                            "prompt_version": P.prompt_version(),
                            "target_words": [C.WORD_MIN, C.WORD_MAX]})
+        if await upstream_busy():
+            yield sse("waiting", {"message": "All the writers are mid-story. "
+                                             "Yours is next in line."})
         payload = {
             "model": MODEL, "messages": build_messages(req),
             "temperature": 0.9, "top_p": 0.95, "max_tokens": 1500,
@@ -232,10 +252,12 @@ async def story(req: StoryRequest, request: Request):
         }
         buf, sent, t0, first = "", 0, time.time(), None
         whole: list[str] = []
+        waiting_sent = False
         async with _sem:
             try:
                 async with httpx.AsyncClient(timeout=httpx.Timeout(
-                        connect=3.0, read=25.0, write=10.0, pool=5.0)) as c:
+                        connect=3.0, read=FIRST_TOKEN_TIMEOUT, write=10.0,
+                        pool=5.0)) as c:
                     async with c.stream("POST", f"{UPSTREAM}/v1/chat/completions",
                                         json=payload) as resp:
                         if resp.status_code != 200:
