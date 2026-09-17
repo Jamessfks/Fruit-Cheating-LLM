@@ -1,0 +1,22 @@
+[Unit]
+Description=Fruit Drama model server (llama.cpp)
+After=network-online.target
+
+[Service]
+Type=exec
+EnvironmentFile=%h/fruit/env/model.env
+ExecStart=%h/fruit/app/serve/serve_llama.sh
+Restart=always
+RestartSec=5
+# Cold start reads a ~22 GB GGUF from disk with --load-mode none.
+TimeoutStartSec=900
+# The kernel should reap the gateway, not the model: the gateway restarts in
+# two seconds, the model takes minutes.
+OOMScoreAdjust=-500
+MemoryMax=95G
+# Never let model weights touch the 16 GB disk swap.
+MemorySwapMax=0
+Nice=-5
+
+[Install]
+WantedBy=default.target
