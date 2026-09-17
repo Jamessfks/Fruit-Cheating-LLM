@@ -1,0 +1,51 @@
+{
+  "_comment": "Reserved exclusively for evaluation. generate_corpus.py excludes these from training premises; build_eval_premises.py draws from them. Never relax this to hit a row target.",
+  "characters": [
+    "Apricot",
+    "Banana",
+    "Coconut",
+    "Eggplant",
+    "Jackfruit",
+    "Kumquat",
+    "Lemon",
+    "Plum",
+    "Star Fruit",
+    "Ugli Fruit"
+  ],
+  "venues": [
+    "a hot-air balloon festival",
+    "backstage at a bake-off",
+    "the compost heap behind the restaurant",
+    "the gender-reveal party",
+    "the vineyard"
+  ],
+  "engines": [
+    "a long con for revenge, years in the making",
+    "a paternity test swapped in the lab",
+    "a plain affair, discovered",
+    "catfished by a relative"
+  ],
+  "discoveries": [
+    "a receipt in a jacket lining",
+    "a ring-camera clip",
+    "lipstick on a collar"
+  ],
+  "human_offences": [
+    "forged my signature",
+    "ghosted me after eleven years",
+    "invited my ex to my party",
+    "sold my car while I was away"
+  ],
+  "human_subjects": [
+    "my ex",
+    "my landlord",
+    "my roommate"
+  ],
+  "degenerate_prompts": [
+    "\ud83c\udf45",
+    "whatever",
+    "just go",
+    "sup",
+    "?!"
+  ]
+}

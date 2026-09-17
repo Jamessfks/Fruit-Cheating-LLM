@@ -28,6 +28,7 @@ from dataclasses import dataclass, field, asdict
 _ROOT = pathlib.Path(__file__).resolve().parents[2]
 _CONFIG = _ROOT / "config" / "generation.json"
 _BIBLE = _ROOT / "data" / "fruit_bible.json"
+_HOLDOUT = _ROOT / "data" / "eval_holdout.json"
 
 # QWERTY adjacency, for typo'd registers. Real user typos are overwhelmingly
 # adjacency slips, transpositions and doubled letters, not random noise.
@@ -127,7 +128,10 @@ def degrade(natural: str, register: str, facets: dict, rng: random.Random) -> st
         short = f"{cast[0].lower() if cast else 'fruit'} and {cast[1].lower() if len(cast) > 1 else 'the neighbour'} at {venue}"
         return _emojify(short, cast, rng)
     if register == "question":
-        return f"what if {natural[0].lower() + natural[1:].rstrip('.')}??"
+        who = cast[0] if cast else "the strawberry"
+        other = cast[1] if len(cast) > 1 else "the neighbour"
+        return (f"what if {who.lower()} found out about {other.lower()} "
+                f"at {venue}??")
     if register == "verbose_constrained":
         extras = rng.choice([
             "make it sad but funny", "i want at least three twists",
@@ -139,7 +143,12 @@ def degrade(natural: str, register: str, facets: dict, rng: random.Random) -> st
         verb = rng.choice(["write me", "give me", "i need", "make me"])
         adj = rng.choice(["something unhinged", "a messy little drama",
                           "the most dramatic thing you can", "a real soap opera"])
-        return f"{verb} {adj} about {natural[0].lower() + natural[1:].rstrip('.')}"
+        if cast:
+            subject = (f"{cast[0].lower()} and the {facets.get('lover_role', 'neighbour')} "
+                       f"at {venue}")
+        else:
+            subject = f"a betrayal at {venue}"
+        return f"{verb} {adj} about {subject}"
     return natural
 
 
@@ -156,12 +165,50 @@ _NATURAL = [
 
 
 class PremiseEngine:
-    def __init__(self, seed: int = 13):
+    def __init__(self, seed: int = 13, mode: str = "train"):
+        """mode='train' excludes the reserved eval facets; mode='eval' uses only them.
+
+        Contamination is prevented structurally rather than measured after the
+        fact: an eval premise whose cast, venue and betrayal engine never occur
+        in training cannot have been memorised.
+        """
         self.cfg = _load(_CONFIG)
         self.bible = _load(_BIBLE)
+        self.mode = mode
+        hold = _load(_HOLDOUT) if _HOLDOUT.exists() else {
+            "characters": [], "venues": [], "engines": [], "discoveries": []}
+        self.holdout = hold
         self.rng = random.Random(seed)
         self.by_name = {e["name"]: e for e in self.bible}
-        self.names = [e["name"] for e in self.bible]
+        all_names = [e["name"] for e in self.bible]
+        if mode == "eval":
+            self.names = list(hold["characters"])
+            self.cfg = dict(self.cfg)
+            self.cfg["venue"] = list(hold["venues"])
+            self.cfg["betrayal_engine"] = list(hold["engines"])
+            self.cfg["discovery"] = list(hold["discoveries"])
+            self.cfg["human_premise_offence"] = list(hold.get("human_offences") or
+                                                     self.cfg["human_premise_offence"])
+            self.cfg["human_premise_subject"] = list(hold.get("human_subjects") or
+                                                     self.cfg["human_premise_subject"])
+            self.cfg["degenerate_prompts"] = list(hold.get("degenerate_prompts") or
+                                                  self.cfg["degenerate_prompts"])
+        else:
+            self.names = [n for n in all_names if n not in set(hold["characters"])]
+            self.cfg = dict(self.cfg)
+            self.cfg["venue"] = [v for v in self.cfg["venue"] if v not in set(hold["venues"])]
+            self.cfg["betrayal_engine"] = [e for e in self.cfg["betrayal_engine"]
+                                           if e not in set(hold["engines"])]
+            self.cfg["discovery"] = [d for d in self.cfg["discovery"]
+                                     if d not in set(hold["discoveries"])]
+            ho, hs = set(hold.get("human_offences") or []), set(hold.get("human_subjects") or [])
+            self.cfg["human_premise_offence"] = [o for o in self.cfg["human_premise_offence"]
+                                                 if o not in ho] or self.cfg["human_premise_offence"]
+            self.cfg["human_premise_subject"] = [x for x in self.cfg["human_premise_subject"]
+                                                 if x not in hs] or self.cfg["human_premise_subject"]
+            hd = set(hold.get("degenerate_prompts") or [])
+            self.cfg["degenerate_prompts"] = [d for d in self.cfg["degenerate_prompts"]
+                                              if d not in hd]
         self._facet_counts: dict[str, Counter] = {}
         self._engine_venue: Counter = Counter()
         self._cast_pair: Counter = Counter()
@@ -244,8 +291,13 @@ class PremiseEngine:
     def _natural(self, f: dict) -> str:
         w, cc, l = (self.by_name[n] for n in f["cast"])
         tpl = self.rng.choice(_NATURAL)
+        # Surnames keep their case after a given name ("Pearl Plum"), and are
+        # lowercased in bare-noun position ("a plum marriage").
+        tpl_has_given = "{w_given}" in tpl or "{c_given}" in tpl
         return tpl.format(
-            w_fruit=w["name"].lower(), c_fruit=cc["name"].lower(), l_fruit=l["name"].lower(),
+            w_fruit=w["name"] if tpl_has_given else w["name"].lower(),
+            c_fruit=cc["name"] if tpl_has_given else cc["name"].lower(),
+            l_fruit=l["name"] if tpl_has_given else l["name"].lower(),
             w_given=w["example"].split()[0], c_given=cc["example"].split()[0],
             lover_role=f["lover_role"], venue=f["venue"], engine=f["engine"],
         )
