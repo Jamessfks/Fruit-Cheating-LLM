@@ -150,8 +150,8 @@ def main() -> int:
     ap.add_argument("--out", default="out/qwen3-30b-a3b-fruit-lora")
     ap.add_argument("--epochs", type=float, default=3.0)
     ap.add_argument("--seqlen", type=int, default=1536)
-    ap.add_argument("--bsz", type=int, default=2)
-    ap.add_argument("--accum", type=int, default=8)
+    ap.add_argument("--bsz", type=int, default=4)
+    ap.add_argument("--accum", type=int, default=8)  # effective batch 32
     ap.add_argument("--lr", type=float, default=7e-5)
     ap.add_argument("--lora-r", type=int, default=32)
     ap.add_argument("--lora-alpha", type=int, default=64)
