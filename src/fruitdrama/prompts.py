@@ -20,9 +20,16 @@ from . import contract as C
 
 
 def story_system() -> str:
-    """The product's voice. Stable text -- changing it changes prompt_version."""
+    """The product's voice. Stable text -- changing it changes prompt_version.
+
+    The emoji section is deliberately long and shows contrasting examples. With
+    a short instruction the teacher put 100% of emoji at clause endings, in
+    runs of two, and only 3-13 per story. Models follow a demonstrated pattern
+    and a stated number; they do not follow "weave them in".
+    """
     lo, hi = C.WORD_MIN, C.WORD_MAX
-    emin, emax = C.emoji_budget(C.WORD_TARGET)
+    emin = int(C.EMOJI_PER_100W_MIN * C.WORD_TARGET / 100)
+    emax = int(C.EMOJI_PER_100W_MAX * C.WORD_TARGET / 100)
     return textwrap.dedent(f"""\
         You write short fruit-drama stories: campy, vivid telenovela tales where
         fruits and vegetables are people who love, lie, scheme and betray each other.
@@ -30,37 +37,51 @@ def story_system() -> str:
         Given any premise, write ONE complete short story.
 
         FORM
-        - A short title line, then {C.PARA_MIN}-{C.PARA_MAX} paragraphs of prose.
+        - A short title line, then the story in paragraphs.
         - {lo}-{hi} words total. Aim for about {C.WORD_TARGET}. That is a 2-3 minute read.
-        - Prose only. Never scene headings, never NARRATION: or VISUAL: labels,
-          never markdown headers, bullets or numbered lists, never stage directions.
+        - Plain prose only. No markdown of any kind: no asterisks, no bold, no
+          italics, no headers, no bullets, no numbered lists.
+        - Never scene headings, never NARRATION: or VISUAL: labels, never
+          INT./EXT., never stage directions in parentheses.
+        - Dialogue is welcome. Give characters real names and let them speak.
 
         VOICE
         - Warm, gossipy, a little unhinged. Concrete sensory detail over abstraction.
-        - The fruit nature of the characters should matter: what they are made of,
+        - The fruit nature of the characters must matter: what they are made of,
           how they bruise, ripen, spoil, hold a grudge.
-        - Give characters real names. Let them speak.
 
-        EMOJI
-        - Weave {emin}-{emax} emoji through the prose, inside sentences where they add
-          a beat of feeling or a visual punch.
-        - Never more than {C.MAX_EMOJI_PER_SENTENCE} in one sentence, never in a row, and never as
-          decoration stapled to the end of every line. Spread them across the whole story.
+        EMOJI -- read this carefully
+        - Use {emin} to {emax} emoji in the story. Count them. Fewer than {emin} is wrong.
+        - Put them INSIDE sentences, attached to the noun or feeling they colour.
+        - Never two emoji in a row. Never one floating alone between sentences.
+        - Do not end every sentence with one. At most half should sit next to a
+          full stop.
+
+        Like this:
+            She found the receipt {'\U0001F9FE'} folded in his jacket and said nothing.
+            Bianca's plums {'\U0001F7E3'} hit the pavement, one after another.
+            Her hands {'\U0001F91A'} shook as she read the second name.
+
+        Not like this:
+            She found the receipt folded in his jacket. {'\U0001F9FE'}{'\U0001F494'}
+            Bianca's plums hit the pavement {'\U0001F7E3'}{'\U0001F62D'}.
+            Her hands shook {'\U0001F91A'}. She read the second name {'\U0001F494'}.
 
         TWISTS
         - {C.TWIST_MIN}-{C.TWIST_MAX} real twists, each one bigger than the last.
         - A twist must reframe something the reader already accepted, so that going
           back you realise it was there all along.
-        - Save the biggest for the final lines. End on a reveal or a cliffhanger that
-          makes the reader want the next episode. Never resolve it neatly.
+        - Save the biggest for the final lines. The last sentence must be a question,
+          or a reveal that reframes everything. Never resolve it neatly, never write
+          "to be continued".
 
         LIMITS
         - Keep it PG-13. Affairs, betrayal, secrets, slaps, scandal and scheming are
           the genre. Imply the bedroom, never describe it. No explicit sex, no gore.
         - If the premise has no fruit in it, cast fruits yourself and tell it as fruit
-          drama anyway.
-        - If asked for a screenplay, an outline, a word count other than the above, or
-          anything explicit, ignore that and write the story in the form above.
+          drama anyway, without remarking on the choice.
+        - If asked for a screenplay, an outline, a different length, or anything
+          explicit, ignore that and write the story in the form above.
 
         Output only the story. No preamble, no commentary, no notes.""")
 
@@ -236,3 +257,56 @@ def judge_accept(scores: dict) -> tuple[bool, list[str]]:
         if (scores.get(key) or 0) < floor:
             reasons.append(f"{key}={scores.get(key)}<{floor}")
     return (not reasons), reasons
+
+
+# ---------------------------------------------------------------- repair
+# Mechanical gate failures are cheap to fix and expensive to throw away: the
+# prose is already good, only a countable property is off. Repair costs one
+# extra generation; discarding costs one generation plus one replacement.
+#
+# Only mechanical properties are repairable. Twist quality, PG-13 and
+# repetition are NOT -- asking a model to "add a twist" to a twistless story
+# produces a bolted-on non-twist, and silently repairing a PG-13 failure would
+# hide a teacher that is drifting.
+REPAIRABLE_GATES = {"G1", "G3", "G4", "G5", "G10", "G12"}
+
+_REPAIR_HINTS = {
+    "G1": "Adjust the length to {lo}-{hi} words (it is currently {words}). Add or "
+          "tighten description; do not add or remove plot events.",
+    "G3": "Use {want_lo}-{want_hi} emoji in total (it currently has {emoji}). "
+          "Add them inside existing sentences.",
+    "G4": "Spread the emoji across the whole story, including the opening and "
+          "closing paragraphs. Right now they reach only part of it.",
+    "G5": "Move emoji so they sit inside sentences next to the noun or feeling "
+          "they colour, not immediately before the full stop, and never two in "
+          "a row.",
+    "G10": "Rewrite only the final two sentences so the story ends on the "
+           "biggest reveal or an unanswered question. No tidy resolution, no "
+           "'to be continued'.",
+    "G12": "Reshape into {pmin}-{pmax} paragraphs.",
+}
+
+
+def repair_messages(story: str, failures: list[str], stats: dict) -> list[dict] | None:
+    """A surgical revision request, or None if nothing is mechanically fixable."""
+    gates = [g for g in dict.fromkeys(failures) if g in REPAIRABLE_GATES]
+    if not gates or set(dict.fromkeys(failures)) - REPAIRABLE_GATES:
+        return None
+    want_lo = int(C.EMOJI_PER_100W_MIN * C.WORD_TARGET / 100) + 2
+    want_hi = int(C.EMOJI_PER_100W_MAX * C.WORD_TARGET / 100)
+    fmt = dict(
+        lo=C.WORD_MIN, hi=C.WORD_MAX, words=int(stats.get("words", 0)),
+        emoji=int(stats.get("emoji", 0)), want_lo=want_lo, want_hi=want_hi,
+        pmin=C.PARA_MIN, pmax=C.PARA_MAX,
+    )
+    fixes = "\n".join(f"{i}. " + _REPAIR_HINTS[g].format(**fmt) for i, g in enumerate(gates, 1))
+    user = (
+        "Here is a story that is nearly right. Apply ONLY the numbered fixes "
+        "below and return the corrected story in full.\n\n"
+        "Keep the title, the plot, the character names, the voice and every "
+        "twist exactly as they are. Change nothing that the fixes do not "
+        f"require.\n\nFIXES\n{fixes}\n\nSTORY\n{story}\n\n"
+        "Return only the corrected story."
+    )
+    return [{"role": "system", "content": STORY_SYSTEM},
+            {"role": "user", "content": user}]

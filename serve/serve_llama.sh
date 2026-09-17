@@ -7,9 +7,10 @@
 # --gpu-memory-utilization percentage to mis-set, which is the main reason this
 # is the primary serving path rather than vLLM on this box.
 #
-# --no-mmap is deliberate: with mmap the GGUF is read through the page cache AND
-# copied into device allocations, doubling the apparent footprint during startup
-# on a box whose OOM killer is the failure mode we most need to avoid.
+# --load-mode none is deliberate (this llama.cpp replaced --no-mmap with -lm):
+# with mmap the GGUF is read through the page cache AND copied into device
+# allocations, doubling the apparent footprint during startup on a box whose
+# OOM killer is the failure mode we most need to avoid.
 set -uo pipefail
 
 MODEL="${MODEL:?set MODEL to a .gguf path}"
@@ -25,13 +26,13 @@ exec "$BIN" \
   -m "$MODEL" \
   --alias "$ALIAS" \
   -ngl 999 \
-  --no-mmap \
+  --load-mode none \
   -c "$CTX" \
   --parallel "$SLOTS" \
   -fa on \
   -b 2048 -ub 512 \
   --cache-type-k q8_0 --cache-type-v q8_0 \
-  --jinja \
+  --jinja --reasoning-budget 0 \
   --threads "$THREADS" \
   --slots --metrics \
   --host "$HOST" --port "$PORT"

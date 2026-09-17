@@ -24,21 +24,37 @@ WORD_GATE_MIN = 480
 WORD_GATE_MAX = 780
 
 # ---------------------------------------------------------------- emoji
-# Expressed per-sentence rather than per-100-words: emoji belong to sentences,
-# and density-per-word drifts with sentence length.
-EMOJI_PER_SENTENCE_MIN = 0.33          # ~1 every 3 sentences
-EMOJI_PER_SENTENCE_MAX = 1.00          # ~1 per sentence
+# Measured per 100 words, NOT per sentence. Real generations run 8.2 words per
+# sentence in this genre (short punchy dramatic lines), so a per-sentence target
+# demanded 21-28 emoji for a 600-word story. The hand-authored seed sits at 2.9
+# per 100 words and reads right; per-100-words is stable against sentence-length
+# style, per-sentence is not.
+EMOJI_PER_100W_MIN = 1.8
+EMOJI_PER_100W_MAX = 5.0
+EMOJI_PER_SENTENCE_MIN = 0.33          # retained for reporting only
+EMOJI_PER_SENTENCE_MAX = 1.00
 MAX_EMOJI_PER_SENTENCE = 2             # 3+ in one sentence reads as spam
 MAX_ADJACENT_EMOJI_PAIRS = 1           # allow one 🍓💔 flourish per story
-MIN_PARAGRAPHS_WITH_EMOJI = 0.60       # spread, not front-loaded
-MIN_SEGMENTS_WITH_EMOJI = 3            # of 5 equal slices of the text
+MIN_PARAGRAPHS_WITH_EMOJI = 0.25       # reported; spread is enforced by segments
+N_SEGMENTS = 5                         # equal text spans
+MIN_SEGMENTS_WITH_EMOJI = 4            # of N_SEGMENTS -- style-stable spread test
 # The gate that enforces "woven through the prose", not decoration: at least
 # half of all emoji must sit mid-sentence rather than trailing a clause.
-MIN_MIDSENTENCE_EMOJI = 0.50
+# Two distinct decorative patterns, measured separately:
+#   * an emoji whose PRECEDING non-space char ends a sentence is floating
+#     between sentences -- the worst form, capped hard.
+#   * an emoji immediately BEFORE a terminator ends a clause, which reads fine
+#     in moderation but becomes a tic if every sentence does it.
+MAX_FLOATING_EMOJI = 1
+MAX_CLAUSE_FINAL_EMOJI_FRACTION = 0.60
 
 # ---------------------------------------------------------------- shape
+# Measured paragraph counts across 12 real generations: 11-39, median 17.
+# Dialogue-heavy telenovela prose naturally runs long here, and it reads better
+# than the 5-10 the first draft assumed. The short-line fraction below is what
+# actually guards against drift into script format.
 PARA_MIN = 5
-PARA_MAX = 10
+PARA_MAX = 30
 MAX_PARA_WORDS = 160
 MAX_SHORT_LINE_FRACTION = 0.60         # catches drift into lists / script cues
 SHORT_LINE_WORDS = 15
@@ -55,6 +71,7 @@ MIN_TTR = 0.28                         # type/token ratio, anti-repetition
 MAX_NGRAM_REPEAT_N = 8                 # no repeated 8-gram within one story
 MAX_SENTENCE_OVERLAP = 0.80            # near-duplicate sentences
 MIN_PROSE_ASCII = 0.95                 # computed AFTER emoji+typography strip
+MAX_ASTERISKS = 4                      # the teacher emits 26-42 per story
 MINHASH_REJECT_JACCARD = 0.50          # cross-story near-duplicate
 MAX_SHARED_OPENING = 3                 # stories sharing a 6-gram opening
 MAX_SHARED_CLOSING = 3

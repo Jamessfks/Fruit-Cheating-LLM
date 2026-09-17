@@ -258,3 +258,42 @@ def opening_ngram(text: str, n: int = 6) -> str:
 def closing_ngram(text: str, n: int = 6) -> str:
     toks = [w.lower() for w in words(text)][-n:]
     return " ".join(toks)
+
+
+def emoji_position_stats(text: str) -> tuple[int, float]:
+    """(floating_count, clause_final_fraction).
+
+    floating   -- emoji preceded by a sentence terminator, i.e. sitting between
+                  sentences as pure decoration. The worst pattern.
+    clause_final -- share of emoji immediately followed by a terminator. Fine in
+                  moderation ("bled crimson \U0001F494."), a tic at high rates.
+    """
+    spans = emoji_spans(text)
+    if not spans:
+        return 0, 0.0
+    terminators = ".!?\u2026\n"
+    quotes = "\"'\u201d\u2019)("
+    floating = 0
+    clause_final = 0
+    for start, end, _ in spans:
+        before = text[:start].rstrip(" \t")
+        while True:
+            m = EMOJI_RE.search(before)
+            if m and m.end() == len(before):
+                before = before[:m.start()].rstrip(" \t")
+            else:
+                break
+        before = before.rstrip(quotes)
+        if before == "" or before[-1] in terminators:
+            floating += 1
+
+        after = text[end:].lstrip(" \t")
+        while True:
+            m = EMOJI_RE.match(after)
+            if not m:
+                break
+            after = after[m.end():].lstrip(" \t")
+        after = after.lstrip(quotes)
+        if after == "" or after[0] in terminators:
+            clause_final += 1
+    return floating, clause_final / len(spans)

@@ -110,7 +110,7 @@ def check_story(
     required_fruits: list[str] | None = None,
 ) -> GateResult:
     r = GateResult(ok=True)
-    text = F._safe(text or "").strip()
+    text = F.normalize_story(text or "")
     if not text:
         r.fail("G0", "empty")
         return r
@@ -143,31 +143,42 @@ def check_story(
 
     # G2 -- storyboard / scaffolding leakage. The failure mode the rebuild exists
     # to remove, so zero tolerance.
-    m = C.LEAKAGE_RE.search(body)
+    m = C.LEAKAGE_RE.search(text)
     if m:
         r.fail("G2", f"format leakage: {m.group(0)[:40]!r}")
+    n_ast = text.count("*")
+    r.stats["asterisks"] = n_ast
+    if n_ast > C.MAX_ASTERISKS:
+        r.fail("G2", f"markdown emphasis: {n_ast} asterisks")
 
-    # G3 -- emoji density, expressed per sentence.
-    if sents:
-        eps = n_emoji / len(sents)
-        if eps < C.EMOJI_PER_SENTENCE_MIN:
-            r.fail("G3", f"too few emoji: {n_emoji} over {len(sents)} sentences")
-        elif eps > C.EMOJI_PER_SENTENCE_MAX:
-            r.fail("G3", f"too many emoji: {n_emoji} over {len(sents)} sentences")
+    # G3 -- emoji density per 100 words (style-stable; see contract.py).
+    if wc:
+        per100 = 100.0 * n_emoji / wc
+        r.stats["emoji_per_100w"] = round(per100, 2)
+        if per100 < C.EMOJI_PER_100W_MIN:
+            r.fail("G3", f"too few emoji: {n_emoji} in {wc}w ({per100:.1f}/100w)")
+        elif per100 > C.EMOJI_PER_100W_MAX:
+            r.fail("G3", f"too many emoji: {n_emoji} in {wc}w ({per100:.1f}/100w)")
 
     # G4 -- spread, not clustering.
     if (mx := T.max_emoji_in_sentence(body)) > C.MAX_EMOJI_PER_SENTENCE:
         r.fail("G4", f"{mx} emoji in one sentence")
-    if T.paragraphs_with_emoji_fraction(body) < C.MIN_PARAGRAPHS_WITH_EMOJI:
-        r.fail("G4", "emoji not spread across paragraphs")
-    if T.segments_with_emoji(body) < C.MIN_SEGMENTS_WITH_EMOJI:
-        r.fail("G4", "emoji bunched into part of the story")
+    segs = T.segments_with_emoji(body, C.N_SEGMENTS)
+    r.stats["segments_with_emoji"] = segs
+    if segs < C.MIN_SEGMENTS_WITH_EMOJI:
+        r.fail("G4", f"emoji reach only {segs}/{C.N_SEGMENTS} parts of the story")
     if T.adjacent_emoji_pairs(body) > C.MAX_ADJACENT_EMOJI_PAIRS:
         r.fail("G4", "emoji runs")
 
-    # G5 -- woven, not bolted on. Half of all emoji must sit mid-sentence.
-    if n_emoji and T.midsentence_emoji_fraction(text) < C.MIN_MIDSENTENCE_EMOJI:
-        r.fail("G5", "emoji only decorate clause endings")
+    # G5 -- woven, not bolted on.
+    if n_emoji:
+        floating, clause_final = T.emoji_position_stats(text)
+        r.stats["floating_emoji"] = floating
+        r.stats["clause_final_frac"] = round(clause_final, 3)
+        if floating > C.MAX_FLOATING_EMOJI:
+            r.fail("G5", f"{floating} emoji floating between sentences")
+        if clause_final > C.MAX_CLAUSE_FINAL_EMOJI_FRACTION:
+            r.fail("G5", f"{clause_final:.0%} of emoji just end a clause")
 
     # G6 -- PG-13.
     if not F.is_sfw(text):

@@ -51,17 +51,35 @@ def clean(text: str) -> str:
 
 
 # --- safety: platform-safe (SFW) filter ---
+# Exact words: matched with word boundaries on both sides.
 _BLOCK_WORDS = [
-    # explicit sexual
     "cock", "cocks", "cum", "cumming", "blowjob", "handjob", "cunt", "pussy",
     "anal", "creampie", "deepthroat", "gangbang", "bukkake", "fellatio",
-    "cunnilingus", "masturbat", "orgasm", "ejaculat", "clitor", "dildo",
-    "porn", "pornhub", "xxx", "nsfw", "titties", "boobs",
-    "fuck", "fucking", "fucked", "fucker", "motherfucker",
-    # slurs (conservative; word-boundaried below)
-    "nigger", "nigga", "faggot", "retard", "chink", "kike", "tranny", "coon",
+    "cunnilingus", "dildo", "porn", "pornhub", "xxx", "nsfw", "titties",
+    "boobs", "fuck", "fucking", "fucked", "fucker", "motherfucker",
+    "nigger", "nigga", "faggot", "retard", "kike", "tranny", "coon",
 ]
-_BLOCK_RE = re.compile(r"|".join(re.escape(w) for w in _BLOCK_WORDS), re.I)
+# Stems: matched from a word boundary and allowed to run on
+# ("masturbat" -> masturbating, masturbation).
+_BLOCK_STEMS = ["masturbat", "orgasm", "ejaculat", "clitor"]
+
+# Stays blocked as a slur, but exempts the two fixed idioms ("a chink of
+# light", "a chink in the armour") rather than dropping the term entirely.
+_BLOCK_CONTEXTUAL = [r"\bchink\b(?!\s+(?:of|in)\b)"]
+
+# NOTE: v1 joined these with re.escape() and no boundaries, despite a comment
+# claiming they were "word-boundaried below". The stem `cum` therefore matched
+# inside "documents", "circumstance", "accumulated" and "Cucumber" -- and
+# Cucumber is one of the 64 bible characters, so every Cucumber story was
+# silently discarded. Boundaries are not cosmetic here.
+_BLOCK_RE = re.compile(
+    "|".join(
+        [r"\b" + re.escape(w) + r"\b" for w in _BLOCK_WORDS]
+        + [r"\b" + re.escape(w) + r"\w*" for w in _BLOCK_STEMS]
+        + _BLOCK_CONTEXTUAL
+    ),
+    re.I,
+)
 
 
 def is_sfw(*texts: str) -> bool:
@@ -128,3 +146,36 @@ DRAMA_KW = re.compile(
 
 def is_dramatic(text: str, min_hits: int = 2) -> bool:
     return len(DRAMA_KW.findall(text or "")) >= min_hits
+
+
+# --- story normalisation ---
+_EMPH = re.compile(r"(?<!\w)(\*{1,3}|_{1,3})(?=\S)(.+?)(?<=\S)\1(?!\w)", re.S)
+_PREAMBLE = re.compile(
+    r"^\s*(?:sure[,!.]?|here(?:'s| is)[^\n]{0,60}|certainly[,!.]?)\s*\n+",
+    re.I,
+)
+_BULLET = re.compile(r"^[ \t]*[-*+\u2022][ \t]+", re.M)
+
+
+def normalize_story(text: str) -> str:
+    """Strip removable formatting artifacts before gating and storage.
+
+    Deliberately conservative: it removes markdown emphasis, a leading
+    conversational preamble, and bullet markers, because those are artifacts of
+    the generator rather than properties of the prose. It does NOT touch emoji
+    placement, runs, length or endings -- those are genuine quality signals and
+    silently repairing them would hide a teacher that is drifting.
+    """
+    if not text:
+        return ""
+    t = _safe(text).strip()
+    t = _PREAMBLE.sub("", t)
+    for _ in range(3):  # nested **_x_** needs more than one pass
+        new = _EMPH.sub(r"\2", t)
+        if new == t:
+            break
+        t = new
+    t = _BULLET.sub("", t)
+    t = re.sub(r"[ \t]+\n", "\n", t)
+    t = re.sub(r"\n{3,}", "\n\n", t)
+    return t.strip()
