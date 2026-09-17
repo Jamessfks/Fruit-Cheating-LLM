@@ -1,0 +1,230 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Fruit Drama</title>
+<style>
+:root{
+  --plum:#5B2A86; --plum-lt:#7B44AB; --ink:#1b1220; --muted:#6b5b76;
+  --bg:#fbf7fd; --card:#fff; --line:#e7dcee; --hot:#c2185b;
+}
+@media (prefers-color-scheme:dark){
+  :root{ --ink:#f3ecf7; --muted:#a894b4; --bg:#17101f; --card:#20172a; --line:#342a3f; }
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100dvh}
+body{
+  background:var(--bg); color:var(--ink);
+  font:16px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  display:flex; flex-direction:column; align-items:center;
+}
+header{width:100%;max-width:44rem;padding:1.6rem 1.1rem .4rem}
+h1{margin:0;font-size:1.45rem;letter-spacing:-.02em}
+h1 span{color:var(--plum)}
+.sub{color:var(--muted);font-size:.88rem;margin:.3rem 0 0}
+main{width:100%;max-width:44rem;padding:0 1.1rem 8rem;flex:1}
+.composer{
+  position:sticky; top:.6rem; z-index:5; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:.7rem;
+  box-shadow:0 6px 22px rgba(91,42,134,.07); margin:.9rem 0 1rem;
+}
+textarea{
+  width:100%; border:0; resize:none; background:transparent; color:inherit;
+  font:inherit; min-height:3.1rem; outline:none;
+}
+.row{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin-top:.45rem}
+button{
+  font:inherit; border:1px solid var(--line); background:var(--card);
+  color:inherit; border-radius:999px; padding:.42rem .95rem; cursor:pointer;
+}
+button:hover{border-color:var(--plum-lt)}
+button.primary{background:var(--plum);border-color:var(--plum);color:#fff;font-weight:600}
+button.primary:disabled{opacity:.55;cursor:default}
+.chips{display:flex;gap:.4rem;flex-wrap:wrap;margin:.2rem 0 1rem}
+.chip{
+  font-size:.82rem;color:var(--muted);border:1px dashed var(--line);
+  border-radius:999px;padding:.32rem .7rem;cursor:pointer;background:transparent;
+}
+.chip:hover{color:var(--plum);border-color:var(--plum-lt)}
+.meter{margin-left:auto;font-size:.8rem;color:var(--muted);font-variant-numeric:tabular-nums}
+article{
+  font:19px/1.72 ui-serif,Georgia,"Times New Roman",serif;
+  max-width:34rem; margin:0 auto; text-wrap:pretty;
+}
+article h2{font-size:1.5rem;line-height:1.25;margin:.2rem 0 1rem;font-weight:600}
+article p{margin:0 0 1.05rem}
+article .w{opacity:0;animation:in .16s ease forwards}
+@keyframes in{from{opacity:0;transform:translateY(2px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){article .w{animation:none;opacity:1}}
+.caret{display:inline-block;width:2px;height:1.05em;background:var(--plum);
+  vertical-align:-.16em;animation:blink 1s step-end infinite}
+@keyframes blink{50%{opacity:0}}
+.note{
+  border:1px solid var(--line);border-left:3px solid var(--hot);border-radius:10px;
+  padding:.7rem .9rem;color:var(--muted);font-size:.9rem;background:var(--card);
+}
+.drawer{border:1px solid var(--line);border-radius:12px;background:var(--card);margin-bottom:1rem}
+.drawer>summary{cursor:pointer;padding:.6rem .9rem;font-size:.9rem;color:var(--muted)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(7.2rem,1fr));
+  gap:.35rem;padding:0 .9rem .9rem;max-height:14rem;overflow:auto}
+.f{display:flex;gap:.35rem;align-items:center;border:1px solid var(--line);
+  border-radius:8px;padding:.3rem .45rem;font-size:.82rem;cursor:pointer;background:transparent;color:inherit}
+.f[aria-pressed=true]{border-color:var(--plum);background:color-mix(in srgb,var(--plum) 12%,transparent)}
+footer{color:var(--muted);font-size:.78rem;padding:0 1.1rem 2rem;max-width:44rem;width:100%}
+</style>
+
+<header>
+  <h1>Fruit <span>Drama</span></h1>
+  <p class="sub">Type any drama. Get a 2–3 minute telenovela about fruit.</p>
+</header>
+
+<main>
+  <div class="composer">
+    <textarea id="premise" rows="2" autofocus
+      placeholder="strawberry catches her husband with the eggplant at the farmers market"></textarea>
+    <div class="row">
+      <button class="primary" id="go">Write my drama</button>
+      <button id="stop" hidden>Stop</button>
+      <button id="again" hidden>Regenerate</button>
+      <button id="copy" hidden>Copy</button>
+      <span class="meter" id="meter"></span>
+    </div>
+  </div>
+
+  <div class="chips" id="chips"></div>
+
+  <details class="drawer" id="drawer">
+    <summary>Cast (optional) — pin specific fruits</summary>
+    <div class="grid" id="grid"></div>
+  </details>
+
+  <div id="msg"></div>
+  <article id="out"></article>
+</main>
+
+<footer>Runs entirely on your DGX Spark. Nothing leaves your tailnet.</footer>
+
+<script>
+const $ = s => document.querySelector(s);
+const out = $("#out"), msg = $("#msg"), meter = $("#meter");
+let ctrl = null, cast = new Set(), lastPremise = "", fullText = "";
+
+fetch("/api/examples").then(r => r.json()).then(d => {
+  $("#chips").innerHTML = "";
+  d.examples.forEach(e => {
+    const b = document.createElement("button");
+    b.className = "chip"; b.textContent = e;
+    b.onclick = () => { $("#premise").value = e; run(); };
+    $("#chips").append(b);
+  });
+}).catch(() => {});
+
+fetch("/api/cast").then(r => r.json()).then(d => {
+  d.fruits.forEach(f => {
+    const b = document.createElement("button");
+    b.className = "f"; b.setAttribute("aria-pressed", "false");
+    b.innerHTML = `<span>${f.emoji}</span><span>${f.name}</span>`;
+    b.onclick = () => {
+      if (cast.has(f.name)) cast.delete(f.name);
+      else if (cast.size < 5) cast.add(f.name);
+      b.setAttribute("aria-pressed", cast.has(f.name));
+    };
+    $("#grid").append(b);
+  });
+}).catch(() => {});
+
+function say(text, kind) {
+  msg.innerHTML = text ? `<div class="note">${text}</div>` : "";
+}
+
+// Render on requestAnimationFrame, draining a queue. Generation outruns reading
+// by roughly 10x, so the job is to avoid layout jank, not to pace the reader.
+let queue = [], raf = null, para = null, first = true;
+function pump() {
+  raf = null;
+  const chunk = queue.splice(0, queue.length).join("");
+  if (!chunk) return;
+  for (const part of chunk.split(/\n\n+/)) {
+    if (part === "") { para = null; continue; }
+    if (!para) {
+      if (first) { para = document.createElement("h2"); first = false; }
+      else para = document.createElement("p");
+      out.append(para);
+    }
+    for (const w of part.split(/(\s+)/)) {
+      if (!w) continue;
+      if (/^\s+$/.test(w)) { para.append(w); continue; }
+      const s = document.createElement("span");
+      s.className = "w"; s.textContent = w; para.append(s);
+    }
+  }
+  const caret = out.querySelector(".caret");
+  if (caret) caret.remove();
+  if (ctrl) { const c = document.createElement("span"); c.className = "caret"; (para || out).append(c); }
+}
+function push(t) { queue.push(t); if (!raf) raf = requestAnimationFrame(pump); }
+
+async function run() {
+  const premise = $("#premise").value.trim();
+  if (!premise) { $("#premise").focus(); return; }
+  lastPremise = premise; fullText = ""; first = true; para = null; queue = [];
+  out.innerHTML = ""; say(""); meter.textContent = "";
+  $("#go").disabled = true; $("#stop").hidden = false;
+  $("#again").hidden = true; $("#copy").hidden = true;
+  ctrl = new AbortController();
+
+  try {
+    const r = await fetch("/api/story", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      signal: ctrl.signal,
+      body: JSON.stringify({ premise, cast: [...cast].map(f => ({ fruit: f, stage: "prime" })) })
+    });
+    if (r.status === 429) { say("The writers' room is full. Try again in a moment."); return finish(); }
+    if (!r.ok) { say("Could not reach the kitchen. Is the model up? Try <code>./fruit status</code>."); return finish(); }
+
+    const reader = r.body.getReader(), dec = new TextDecoder();
+    let buf = "";
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const frames = buf.split("\n\n"); buf = frames.pop();
+      for (const f of frames) {
+        const ev = (f.match(/^event: (.+)$/m) || [])[1];
+        const dm = f.match(/^data: (.+)$/m);
+        if (!ev || !dm) continue;
+        const d = JSON.parse(dm[1]);
+        if (ev === "delta") { fullText += d.t; push(d.t); }
+        else if (ev === "done") {
+          meter.textContent = `${d.words} words · ${d.read_min} min read · ${d.emoji} emoji`;
+        } else if (ev === "policy") say(d.message || "That premise did not work. Try another.");
+        else if (ev === "error") say((d.message || "Something broke.") + " Try again.");
+      }
+    }
+  } catch (e) {
+    if (e.name !== "AbortError") say("The connection dropped. Your text is preserved — press Regenerate.");
+  }
+  finish();
+}
+function finish() {
+  ctrl = null; pump();
+  $("#go").disabled = false; $("#stop").hidden = true;
+  if (fullText) { $("#again").hidden = false; $("#copy").hidden = false; }
+}
+
+$("#go").onclick = run;
+$("#again").onclick = () => { $("#premise").value = lastPremise; run(); };
+$("#stop").onclick = () => ctrl && ctrl.abort();
+$("#copy").onclick = async () => {
+  try { await navigator.clipboard.writeText(fullText); $("#copy").textContent = "Copied"; }
+  catch { const t = document.createElement("textarea"); t.value = fullText;
+    document.body.append(t); t.select(); document.execCommand("copy"); t.remove();
+    $("#copy").textContent = "Copied"; }
+  setTimeout(() => $("#copy").textContent = "Copy", 1400);
+};
+$("#premise").addEventListener("keydown", e => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); run(); }
+});
+
+// Surface a loading model as a warming state rather than a connection error.
+fetch("/readyz").then(r => { if (r.status === 503) say("The model is still warming up. This takes a minute on a cold start."); }).catch(() => {});
+</script>
