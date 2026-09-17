@@ -35,7 +35,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "src"))
 
 from fruitdrama import prompts as P            # noqa: E402
 from fruitdrama import teacher as T            # noqa: E402
-from fruitdrama.gates import CorpusDedup, check_story  # noqa: E402
+from fruitdrama.gates import CorpusDedup, check_story, repairable  # noqa: E402
 from fruitdrama.judge import score_story       # noqa: E402
 from fruitdrama.premises import PremiseEngine  # noqa: E402
 
@@ -181,7 +181,13 @@ def main() -> int:
         stats["seen"] += 1
         r = check_story(text, premise=premise.user_prompt)
         story = text
-        if not r.ok:
+        # Repair ONLY length-only misses. Measured: of 22 general repair
+        # attempts 1 succeeded, and post-repair rejects were worse than
+        # pre-repair (ending 7->12, spread 6->13) because a model asked for a
+        # surgical fix rewrites the whole story. Worse, handle() is sequential,
+        # so a repair per failing story serialised ~68 generations per wave and
+        # stalled the run: 128 stories generated, 1 handled.
+        if not r.ok and repairable(r):
             msgs = P.repair_messages(text, r.failures, r.stats)
             if msgs:
                 try:
