@@ -18,10 +18,18 @@ WORD_MIN = 500
 WORD_MAX = 750
 WORD_TARGET = 620
 
-# Gate band is wider than the ask: the judge arbitrates the edges, and rows
-# that miss on length alone are cheap to repair rather than discard.
+# Gate band is slightly wider than the spec; the judge arbitrates the edges.
 WORD_GATE_MIN = 480
 WORD_GATE_MAX = 780
+
+# What we ASK the generator for, as distinct from what the gate ENFORCES.
+# Measured: with an ask of 620 and an explicit "do not exceed 750", gemma's
+# length failures were 97 too-long and 0 too-short, median 813 words -- a
+# systematic +80..+120 overshoot, because models cannot count words. Asking for
+# a lower number moves the distribution into the band without touching the
+# product spec, which stays WORD_MIN..WORD_MAX and is what the gate checks.
+PROMPT_WORD_TARGET = 540
+PROMPT_WORD_MAX = 650
 
 # ---------------------------------------------------------------- emoji
 # Measured per 100 words, NOT per sentence. Real generations run 8.2 words per

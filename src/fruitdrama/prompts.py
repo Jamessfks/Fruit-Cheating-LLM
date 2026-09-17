@@ -28,7 +28,8 @@ def story_system() -> str:
     and a stated number; they do not follow "weave them in".
     """
     lo, hi = C.WORD_MIN, C.WORD_MAX
-    emin = int(C.EMOJI_PER_100W_MIN * C.WORD_TARGET / 100)
+    ask, ask_max = C.PROMPT_WORD_TARGET, C.PROMPT_WORD_MAX
+    emin = max(8, int(C.EMOJI_PER_100W_MIN * C.WORD_TARGET / 100))
     emax = int(C.EMOJI_PER_100W_MAX * C.WORD_TARGET / 100)
     return textwrap.dedent(f"""\
         You write short fruit-drama stories: campy, vivid telenovela tales where
@@ -42,8 +43,8 @@ def story_system() -> str:
           second title, no date lines, no chapter or part labels, no scene
           labels, no "Later"/"At the hospital" signposts, no NARRATION: or
           VISUAL: labels, no camera or stage directions in parentheses.
-        - {lo}-{hi} words total. Aim for about {C.WORD_TARGET} and do not exceed {hi}.
-          That is a 2-3 minute read.
+        - About {ask} words. Never more than {ask_max}. Stop when the twist lands;
+          do not pad. That is a 2-3 minute read.
         - Plain prose only. No markdown of any kind: no asterisks, no bold, no
           italics, no headers, no bullets, no numbered lists.
         - Never scene headings, never NARRATION: or VISUAL: labels, never

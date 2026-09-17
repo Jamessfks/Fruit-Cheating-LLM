@@ -144,7 +144,11 @@ def main() -> int:
 
     n_premises = int(args.target * args.max_attempts_multiple)
     eng = PremiseEngine(seed=args.seed)
-    premises = [p for p in eng.generate(n_premises) if p.id not in done]
+    drawn = list(eng.generate(n_premises))
+    # Keep the full id map: the startup recovery pass below needs the premise
+    # objects for generations that were written but never gated.
+    all_premises = {p.id: p for p in drawn}
+    premises = [p for p in drawn if p.id not in done]
     print(f"premises: {n_premises} drawn, {len(premises)} outstanding, "
           f"target {args.target} accepted")
 
@@ -239,6 +243,26 @@ def main() -> int:
             "messages": P.training_messages(premise.user_prompt, story),
         })
         return True
+
+    stranded = sorted(raw_w.done - acc_w.done - rej_w.done)
+    if stranded:
+        print(f"re-gating {len(stranded)} generations written but never handled "
+              f"(stranded by an earlier restart)", flush=True)
+        want = set(stranded)
+        texts = {}
+        for line in (out / "raw.jsonl").read_text().splitlines():
+            if not line.strip():
+                continue
+            rec = json.loads(line)
+            if rec.get("premise_id") in want and rec.get("text"):
+                texts[rec["premise_id"]] = rec["text"]
+        recovered = 0
+        for pid in stranded:
+            prem, text = all_premises.get(pid), texts.get(pid)
+            if prem and text and handle(prem, text):
+                recovered += 1
+        print(f"recovered {recovered} accepted rows from disk", flush=True)
+        report()
 
     # Generate in waves so accepted rows can enter the few-shot pool and the
     # dedup index stays a single-threaded structure.
