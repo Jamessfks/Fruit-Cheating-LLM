@@ -36,6 +36,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "src"))
 
 from fruitdrama import prompts as P            # noqa: E402
 from fruitdrama import teacher as T            # noqa: E402
+from fruitdrama.filters import normalize_story  # noqa: E402
 from fruitdrama.gates import CorpusDedup, check_story  # noqa: E402
 from fruitdrama.judge import score_story       # noqa: E402
 from fruitdrama.premises import PremiseEngine  # noqa: E402
@@ -184,8 +185,11 @@ def main() -> int:
     def handle(premise, text):
         """Gate -> dedup -> optional judge. Purely local; returns True if accepted."""
         stats["seen"] += 1
-        r = check_story(text, premise=premise.user_prompt)
-        story = text
+        # Normalise FIRST, then gate and store the same string. check_story()
+        # normalises internally, so gating raw text while storing raw text meant
+        # markdown the gates thought they had removed reached the corpus.
+        story = normalize_story(text)
+        r = check_story(story, premise=premise.user_prompt)
         # No repair pass. Measured twice, and it loses both times:
         #   * General repair: 22 attempts, 1 success, and post-repair rejects
         #     WORSE than pre-repair (ending 7->12, spread 6->13) because a model

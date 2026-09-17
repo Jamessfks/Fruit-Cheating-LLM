@@ -25,6 +25,7 @@ import sys
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "src"))
 
 from fruitdrama import contract as C          # noqa: E402
+from fruitdrama.filters import normalize_story  # noqa: E402
 from fruitdrama import prompts as P           # noqa: E402
 from fruitdrama import textstats as T         # noqa: E402
 from fruitdrama.gates import check_story      # noqa: E402
@@ -56,7 +57,16 @@ def main() -> int:
             r = json.loads(line)
             if r.get("story") and r.get("messages"):
                 rows.append(r)
-    print(f"loaded {len(rows)} gate-accepted rows")
+    # Re-normalise: rows written before the generate_corpus fix stored raw text.
+    fixed = 0
+    for r in rows:
+        clean = normalize_story(r["story"])
+        if clean != r["story"]:
+            r["story"] = clean
+            r["messages"] = P.training_messages(r["premise"], clean)
+            fixed += 1
+    print(f"loaded {len(rows)} gate-accepted rows"
+          + (f"; re-normalised {fixed} that still carried formatting artifacts" if fixed else ""))
 
     if args.judged:
         jp = pathlib.Path(args.judged)

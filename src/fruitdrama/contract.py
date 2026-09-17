@@ -123,9 +123,13 @@ LEAKAGE_PATTERNS = [
     r"^[A-Z][A-Z \.'’\-]{3,}:",    # ALL-CAPS screenplay character cue
     r"^\s*\(.*\)\s*$",             # parenthetical stage direction
     r"\bV\.O\.\b",                     # voiceover
+    # Episode-recap scaffolding. Slips through in TITLE position, where
+    # split_title() removes it before the mid-story header check can see it.
+    r"^\s*[^\w\n]{0,3}\s*previously\s+on\b",
+    r"^\s*[^\w\n]{0,3}\s*(next time|to be continued|last (?:time|episode))\b",
     r"^\s*(FADE (IN|OUT)|CUT TO|DISSOLVE)\b",
 ]
-LEAKAGE_RE = re.compile("|".join(LEAKAGE_PATTERNS), re.M)
+LEAKAGE_RE = re.compile("|".join(LEAKAGE_PATTERNS), re.M | re.I)
 
 # Endings that deflate a cliffhanger.
 RESOLVED_ENDING_RE = re.compile(

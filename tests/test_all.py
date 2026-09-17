@@ -127,6 +127,21 @@ for para, should_flag, label in [
     check(flagged == should_flag,
           f"{'flags' if should_flag else 'allows'} {label}: {para[:32]!r}")
 
+section("recap scaffolding is caught even in title position")
+for text, want, label in [
+    ("\U0001F34APreviously On\u2026\n\nGreta Grape wept.", True, "recap title"),
+    ("PREVIOUSLY ON: The Grove\n\nShe wept.", True, "caps recap"),
+    ("Next time: the second test\n\nShe wept.", True, "next-time teaser"),
+    ("\U0001F353 The Receipt in the Melon Crate\n\nShe wept.", False, "ordinary title"),
+    ("She had previously on occasion lied.", False, "the phrase mid-sentence"),
+]:
+    check(bool(C.LEAKAGE_RE.search(text)) == want, f"{label}: {text[:26]!r}")
+
+section("normalisation must be applied to what we STORE, not just what we gate")
+raw = "He was not *fashionable* enough.\n\n\n\nShe wept \U0001F62D."
+check("*" not in normalize_story(raw), "emphasis stripped")
+check("\n\n\n" not in normalize_story(raw), "blank runs collapsed")
+
 section("title splitting and character counting")
 title, body = split_title("\U0001F353 The Receipt\n\nShe wept.")
 check(title is not None and "Receipt" in title, "title extracted")
