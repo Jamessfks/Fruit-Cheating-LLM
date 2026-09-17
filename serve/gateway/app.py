@@ -187,6 +187,14 @@ async def readyz():
     return JSONResponse({"ready": False, "reason": "model_loading"}, status_code=503)
 
 
+@app.get("/version")
+async def version():
+    """What this PROCESS is serving. The gateway holds the prompt it started
+    with, so a synced-but-not-restarted prompt change is otherwise invisible."""
+    return {"prompt_version": P.prompt_version(), "model": MODEL,
+            "upstream": UPSTREAM, "slots": SLOTS}
+
+
 @app.get("/metrics")
 async def metrics():
     return dict(_metrics)

@@ -50,7 +50,22 @@ status)
       python3 -c 'import json,sys; print([m["id"] for m in json.load(sys.stdin)["data"]])' 2>/dev/null ||
       echo "no model server on :8000"
     echo "=== tmux ==="; tmux ls 2>/dev/null || echo "no sessions"
+    echo "=== gateway prompt version ==="
+    curl -s localhost:8080/version 2>/dev/null |
+      python3 -c 'import json,sys; d=json.load(sys.stdin); print(d["prompt_version"], "| model", d["model"])' 2>/dev/null ||
+      echo "gateway not responding"
 REMOTE
+  # A gateway that started before a prompt change serves the old prompt, so the
+  # app and the eval harness would disagree about what is being measured.
+  local_v=$(cd "$(dirname "$0")/.." && PYTHONPATH=src python3 -c \
+    'from fruitdrama import prompts; print(prompts.prompt_version())' 2>/dev/null)
+  remote_v=$("${SSH[@]}" "curl -s localhost:8080/version 2>/dev/null" |
+    python3 -c 'import json,sys; print(json.load(sys.stdin)["prompt_version"])' 2>/dev/null)
+  if [ -n "$local_v" ] && [ -n "$remote_v" ] && [ "$local_v" != "$remote_v" ]; then
+    echo
+    echo "WARNING: prompt drift. local=$local_v  gateway=$remote_v"
+    echo "         run: ./ops/fruit sync && ./ops/fruit down && ./ops/fruit up"
+  fi
   ;;
 corpus)
   "${SSH[@]}" bash -s <<'REMOTE'
