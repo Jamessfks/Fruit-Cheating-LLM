@@ -37,6 +37,9 @@ def main() -> int:
     ap.add_argument("--out-prefix", default="data/story_sft")
     ap.add_argument("--val-fraction", type=float, default=0.02)
     ap.add_argument("--seed", type=int, default=13)
+    ap.add_argument("--judged", default="",
+                    help="judged.jsonl from judge_corpus.py; rows that failed "
+                         "the judge are excluded")
     ap.add_argument("--recheck", action="store_true",
                     help="re-run gates on every row (slow, but proves the file)")
     args = ap.parse_args()
@@ -53,7 +56,32 @@ def main() -> int:
             r = json.loads(line)
             if r.get("story") and r.get("messages"):
                 rows.append(r)
-    print(f"loaded {len(rows)} accepted rows")
+    print(f"loaded {len(rows)} gate-accepted rows")
+
+    if args.judged:
+        jp = pathlib.Path(args.judged)
+        if not jp.exists():
+            print(f"FATAL: {jp} not found", file=sys.stderr)
+            return 2
+        verdict = {}
+        for line in jp.read_text().splitlines():
+            if line.strip():
+                j = json.loads(line)
+                verdict[j["premise_id"]] = j
+        before = len(rows)
+        # Unjudged rows are kept (the judge pass may be partial); only explicit
+        # failures are dropped, so a half-finished judge run cannot silently
+        # shrink the corpus.
+        rows = [r for r in rows
+                if verdict.get(r["premise_id"], {}).get("judge_ok") is not False]
+        for r in rows:
+            j = verdict.get(r["premise_id"])
+            if j:
+                r["judge"] = j.get("scores")
+                r["n_twists"] = j.get("n_twists")
+        print(f"judge pass: {before} -> {len(rows)} rows "
+              f"({before - len(rows)} rejected, "
+              f"{sum(1 for r in rows if r['premise_id'] not in verdict)} unjudged kept)")
 
     # Contamination assertion. The holdout makes overlap structurally
     # impossible, so any hit here means the holdout was bypassed -- fail loudly
