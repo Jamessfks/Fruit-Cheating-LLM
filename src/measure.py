@@ -5,7 +5,7 @@ os.environ.setdefault("PQ_TMP", os.path.join(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__))), "pq_tmp"))
 os.makedirs(os.environ["PQ_TMP"], exist_ok=True)
 import adapters as A
-import filters as F
+from fruitdrama import filters as F
 
 GEN = ['drama', 'romance', 'psychological', 'thriller', 'mystery', 'crime',
        'noir', 'historical', 'biopic', 'war', 'horror']

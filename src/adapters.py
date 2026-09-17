@@ -15,7 +15,7 @@ import time
 import tempfile
 import urllib.request
 
-import filters as F
+from fruitdrama import filters as F
 
 _UA = {"User-Agent": "fruit-cheating-llm/1.0"}
 _PQ_TMP = os.environ.get("PQ_TMP", tempfile.gettempdir())
