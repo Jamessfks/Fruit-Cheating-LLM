@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Corpus generation: premises -> teacher -> gates -> repair -> judge -> SFT rows.
+"""Corpus generation: premises -> teacher -> gates -> dedup -> SFT rows.
 
 Built for a multi-day job on one box. Design constraints that shaped it:
 
@@ -8,8 +8,9 @@ Built for a multi-day job on one box. Design constraints that shaped it:
 * **Every rejection is recorded with its reason.** The per-gate accept rate is
   the earliest signal that the teacher has drifted; noticing at row 500 instead
   of row 20,000 is the difference between a bad hour and a bad day.
-* **Repair before discard.** Mechanical misses (length, emoji count/placement,
-  ending) cost one extra generation to fix and two to replace.
+* **No repair.** Measured twice and it loses both times; see handle() for the
+  arithmetic. Generation is 32-way parallel, repair is serial, and premises are
+  not the scarce resource.
 * **Live throughput and ETA**, because a job whose finish time is unknown
   cannot be planned around.
 
@@ -35,7 +36,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "src"))
 
 from fruitdrama import prompts as P            # noqa: E402
 from fruitdrama import teacher as T            # noqa: E402
-from fruitdrama.gates import CorpusDedup, check_story, repairable  # noqa: E402
+from fruitdrama.gates import CorpusDedup, check_story  # noqa: E402
 from fruitdrama.judge import score_story       # noqa: E402
 from fruitdrama.premises import PremiseEngine  # noqa: E402
 
@@ -166,7 +167,7 @@ def main() -> int:
         eta = (args.target - acc) / rate if rate else 0
         print(
             f"[{el/60:6.1f}m] seen={stats['seen']:6d} accepted={acc:6d} "
-            f"({100*acc/max(1,stats['seen']):4.1f}%) repaired={stats['repaired']:5d} "
+            f"({100*acc/max(1,stats['seen']):4.1f}%) "
             f"gate_rej={stats['gate_rej']:6d} judge_rej={stats['judge_rej']:5d} "
             f"dup={stats['dup']:4d} err={stats['err']:4d} | "
             f"{rate:5.0f} rows/h ETA {eta:4.1f}h",
@@ -177,27 +178,21 @@ def main() -> int:
             print("        judge:", dict(judge_rejects.most_common(6)), flush=True)
 
     def handle(premise, text):
-        """Gate -> repair -> gate -> judge -> dedup. Returns True if accepted."""
+        """Gate -> dedup -> optional judge. Purely local; returns True if accepted."""
         stats["seen"] += 1
         r = check_story(text, premise=premise.user_prompt)
         story = text
-        # Repair ONLY length-only misses. Measured: of 22 general repair
-        # attempts 1 succeeded, and post-repair rejects were worse than
-        # pre-repair (ending 7->12, spread 6->13) because a model asked for a
-        # surgical fix rewrites the whole story. Worse, handle() is sequential,
-        # so a repair per failing story serialised ~68 generations per wave and
-        # stalled the run: 128 stories generated, 1 handled.
-        if not r.ok and repairable(r):
-            msgs = P.repair_messages(text, r.failures, r.stats)
-            if msgs:
-                try:
-                    fixed = T.chat(tcfg, msgs)
-                    r2 = check_story(fixed, premise=premise.user_prompt)
-                    if r2.ok:
-                        stats["repaired"] += 1
-                        story, r = fixed, r2
-                except Exception:
-                    pass
+        # No repair pass. Measured twice, and it loses both times:
+        #   * General repair: 22 attempts, 1 success, and post-repair rejects
+        #     WORSE than pre-repair (ending 7->12, spread 6->13) because a model
+        #     asked for a surgical fix rewrites the whole story.
+        #   * Length-only repair: recovers ~4 rows per 100 stories, but runs
+        #     SERIALLY at single-stream speed while all 32 slots idle -- about
+        #     15 minutes per 100 stories. That same 15 minutes of parallel
+        #     generation produces ~53 stories, i.e. ~25 accepted. Repair is ~6x
+        #     worse per unit time, and premises are not the scarce resource
+        #     (30,000 drawn for a 10,000-row target).
+        # Keep handle() purely local so the GPU is never idle waiting on it.
         if not r.ok:
             stats["gate_rej"] += 1
             for g in dict.fromkeys(r.failures):
@@ -280,8 +275,7 @@ def main() -> int:
     report()
     summary = {
         "target": args.target, "accepted": stats["accepted"],
-        "seen": stats["seen"], "repaired": stats["repaired"],
-        "gate_rejects": dict(gate_rejects), "judge_rejects": dict(judge_rejects),
+        "seen": stats["seen"], "gate_rejects": dict(gate_rejects), "judge_rejects": dict(judge_rejects),
         "dedup_rejects": dict(dedup.rejects), "errors": stats["err"],
         "prompt_version": prompt_v, "elapsed_h": round((time.time()-t0)/3600, 2),
     }
