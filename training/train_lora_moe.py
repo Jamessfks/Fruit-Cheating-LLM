@@ -30,10 +30,24 @@ import argparse
 import glob
 import json
 import os
+import pathlib
 import threading
 import time
 
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+
+# Qwen3-MoE's router dispatches to a Triton kernel
+# (torch._native.ops.bmm_outer_product), and Triton JIT-compiles a CUDA driver
+# shim with gcc, which needs Python.h. `python3.12-dev` is not installed and
+# apt needs a password on this box, so the headers are unpacked from the .deb
+# into ~/fruit/pydev with `dpkg-deb -x` (no root required) and pointed at here.
+# Without this the first forward pass dies in subprocess.CalledProcessError
+# after a successful 6-minute model load, which is a miserable way to find out.
+_PYDEV = pathlib.Path(os.path.expanduser("~/fruit/pydev/usr/include"))
+if (_PYDEV / "python3.12" / "Python.h").exists():
+    _paths = [str(_PYDEV / "python3.12"), str(_PYDEV)]
+    os.environ["CPATH"] = os.pathsep.join(
+        _paths + ([os.environ["CPATH"]] if os.environ.get("CPATH") else []))
 # Fragmentation hurts more on unified memory, where there is no separate VRAM
 # arena to absorb it.
 os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")

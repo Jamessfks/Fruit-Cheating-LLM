@@ -57,4 +57,18 @@ else
   step "BUILD FAILED - llama-server missing"
   exit 1
 fi
+# ---------------------------------------------------------------- py headers
+# Triton JIT needs Python.h to build its CUDA driver shim, and python3.12-dev
+# cannot be apt-installed without a password. Unpack the .deb as a normal user.
+if [ ! -f "$ROOT/pydev/usr/include/python3.12/Python.h" ]; then
+  step "unpacking python3.12 dev headers for Triton (no sudo)"
+  tmp=$(mktemp -d)
+  ( cd "$tmp" && apt-get download python3.12-dev libpython3.12-dev >/dev/null 2>&1 )
+  mkdir -p "$ROOT/pydev"
+  for d in "$tmp"/*.deb; do dpkg-deb -x "$d" "$ROOT/pydev"; done
+  rm -rf "$tmp"
+  [ -f "$ROOT/pydev/usr/include/python3.12/Python.h" ] \
+    && step "headers ok" || step "WARNING: header unpack failed"
+fi
+
 step "bootstrap complete"
