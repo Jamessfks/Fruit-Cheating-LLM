@@ -26,7 +26,7 @@ if [ ! -x "$VENV/bin/python" ]; then
   python3 -m venv "$VENV"
 fi
 "$VENV/bin/pip" install -q --upgrade pip wheel 2>&1 | tail -2
-"$VENV/bin/pip" install -q "huggingface_hub[hf_transfer,cli]" 2>&1 | tail -2
+"$VENV/bin/pip" install -q huggingface_hub hf_transfer 2>&1 | tail -2
 step "venv ready: $("$VENV/bin/python" --version)"
 
 # ---------------------------------------------------------------- llama.cpp
