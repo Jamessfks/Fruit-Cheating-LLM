@@ -252,6 +252,33 @@ def judge_messages(user_prompt: str, story: str, order_seed: int = 0) -> list[di
     return [{"role": "system", "content": system}, {"role": "user", "content": user}]
 
 
+# MEASURED BEHAVIOUR OF THE JUDGE (Qwen3-30B-A3B scoring gemma's stories):
+#
+#   case              verified twists   dimension scores
+#   gold seed 1/2           3           all 5
+#   gold seed 3             2           all 5
+#   v1 storyboard           0           ALL 5   <-- saturated
+#   twistless prose         1           1,1,1,2,3,4,1
+#   emoji spam              0           1,1,1,2,2,1,2
+#
+# Two consequences shape this function:
+#
+# 1. The dimension scores SATURATE at 5 for anything fluent -- a pasted v1
+#    storyboard scored 5 on every axis. They discriminate only against grossly
+#    bad prose, so they are kept as a backstop against degenerate output, not
+#    used as a quality signal. Absolute LLM scoring is unreliable here;
+#    eval/ab_compare.py's pairwise comparison is the trustworthy gate, because
+#    a relative judgement cannot saturate the way an absolute one does.
+#
+# 2. The quote-anchored twist enumeration IS reliable and is what caught the
+#    storyboard (0) and the twistless story (1). But the judge UNDERCOUNTS:
+#    it found only 2 twists in a hand-authored seed that has at least 3. The
+#    admission threshold is set to 2 to match measured behaviour rather than
+#    discarding good stories over the judge's conservatism; the deterministic
+#    reversal screen (G9) already filters the genuinely twistless.
+JUDGE_MIN_VERIFIED_TWISTS = 2
+
+
 def judge_accept(scores: dict) -> tuple[bool, list[str]]:
     """Corpus-admission decision from a parsed judge response."""
     reasons: list[str] = []
@@ -259,8 +286,8 @@ def judge_accept(scores: dict) -> tuple[bool, list[str]]:
         t for t in scores.get("twists", [])
         if t.get("recontextualizes") and (t.get("genuineness") or 0) >= 3
     ]
-    if len(twists) < C.TWIST_MIN:
-        reasons.append(f"only {len(twists)} real twists")
+    if len(twists) < JUDGE_MIN_VERIFIED_TWISTS:
+        reasons.append(f"only {len(twists)} verified twists")
     if not scores.get("pg13", False):
         reasons.append("pg13 fail")
     for key, floor in (

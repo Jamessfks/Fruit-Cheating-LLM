@@ -87,7 +87,7 @@ def score_story(
     if dropped:
         reasons.append(f"{dropped} twist quote(s) not found in story")
     # Unverifiable quotes are tolerated only while enough verified twists remain.
-    accept = ok and len(verified) >= 3
+    accept = ok and len(verified) >= P.JUDGE_MIN_VERIFIED_TWISTS
     return Judgement(accept, reasons, scores, len(verified))
 
 

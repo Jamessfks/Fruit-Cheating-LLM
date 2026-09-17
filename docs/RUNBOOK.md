@@ -40,14 +40,28 @@ ssh spark-2e6c 'cd ~/fruit/app && tmux new-session -d -s corpus \
 128 generations that have not been written yet). It *is* fully resumable — keyed
 on premise id across three append-only JSONLs — but each restart costs a wave.
 
-## 2. Judge pass (~10 h for 10k)
+## 2. Judge pass (~7 h for 10k)
 
-Swap to a model from a **different family than the writer**, then:
+Swap to a model from a **different family than the writer**, then **calibrate it
+before trusting it**:
 
 ```bash
 ./ops/fruit serve '~/fruit/models/gguf/qwen3-30b-a3b-base/Qwen3-30B-A3B-Instruct-2507-UD-Q5_K_XL.gguf' judge 16 131072
-./ops/fruit judge
+python eval/judge_calibration.py --judge-url http://127.0.0.1:8000
+./ops/fruit judge        # only if calibration passed
 ```
+
+`judge_calibration.py` scores the three gold seeds against three deliberately
+broken stories (a v1 storyboard, twistless prose, emoji spam) and exits non-zero
+unless every seed is accepted and every negative rejected. Run it whenever the
+judge model or the rubric changes.
+
+**Known behaviour, measured:** the seven rubric dimensions **saturate** — a
+pasted v1 storyboard scored 5/5 on every axis. The quote-anchored twist
+enumeration is the load-bearing signal (it gave that storyboard 0). So a green
+judge block is necessary but not sufficient; the gates that carry weight are the
+deterministic metrics and `ab_compare.py`'s pairwise comparison, which cannot
+saturate because it is a relative judgement.
 
 ## 3. Dataset assembly
 
