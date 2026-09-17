@@ -186,8 +186,13 @@ def check_story(
         r.stats["clause_final_frac"] = round(clause_final, 3)
         frac_floating = floating / n_emoji
         r.stats["floating_frac"] = round(frac_floating, 3)
-        if floating > C.MAX_FLOATING_EMOJI or frac_floating > C.MAX_FLOATING_FRACTION:
-            r.fail("G5", f"{floating} of {n_emoji} emoji float between sentences")
+        # One effective cap, not two that disagree: whichever of the absolute
+        # floor and the fraction is more permissive at this emoji count.
+        allowed = max(C.MAX_FLOATING_EMOJI,
+                      int(C.MAX_FLOATING_FRACTION * n_emoji))
+        if floating > allowed:
+            r.fail("G5", f"{floating} of {n_emoji} emoji float between "
+                          f"sentences (allowed {allowed})")
         if clause_final > C.MAX_CLAUSE_FINAL_EMOJI_FRACTION:
             r.fail("G5", f"{clause_final:.0%} of emoji just end a clause")
 

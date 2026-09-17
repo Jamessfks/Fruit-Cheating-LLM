@@ -43,6 +43,12 @@ EMOJI_PER_100W_MAX = 5.0   # generations, not by copying the gold seeds
 # Measured: an ask of "12 to 24" produced a median of 10, with the low tail at 5
 # driving 189 of 500 rejections. The model anchors below any range it is given,
 # so the ask is a single number set well above the gate's requirement.
+# NEGATIVE RESULT: this does not work. Three asks were measured -- a 8-31 range,
+# a 12-24 range, and this firm target of 22 -- and all three produced an emoji
+# median of 10-11. The model has a hard ceiling here that prompting does not
+# move, so the gate floor (EMOJI_PER_100W_MIN) is set to what it can actually
+# deliver rather than what we would prefer. Kept at 22 because it does no harm
+# and the low tail is slightly better with it.
 EMOJI_PROMPT_TARGET = 22
 
 EMOJI_PER_SENTENCE_MIN = 0.33          # retained for reporting only
