@@ -20,11 +20,16 @@ usage: fruit <command>
 
   status     one-screen health of the box, models and jobs
   corpus     progress of the corpus generation run
-  logs <n>   tail the corpus log (default 30 lines)
+  logs <name> follow a log: corpus (default), train, judge, gateway, model
   up         start model + gateway, wait for ready, open the app
   down       stop gateway and model (frees the GPU)
   sync       push local code to the Spark
+  judge      judge the gate-accepted corpus with a different model family
+  dataset    assemble train/val JSONL + dataset card from the judged corpus
+  train      launch the LoRA run (runs --smoke first and refuses on failure)
   eval       run the ship-gate eval against the serving endpoint
+  ab         blind position-swapped A/B of two endpoints
+  serve      swap the served GGUF (args: <gguf-path> <alias> [slots] [ctx])
   shell      ssh into the Spark at the project root
 USAGE
 }
@@ -60,7 +65,7 @@ corpus)
     grep -E "^        (gates|judge)" "$HOME/fruit/logs/corpus.log" 2>/dev/null | tail -2
 REMOTE
   ;;
-logs)  "${SSH[@]}" "tail -${2:-30} \$HOME/fruit/logs/corpus.log" ;;
+logs)  "${SSH[@]}" "tail -f -n ${3:-40} \$HOME/fruit/logs/${2:-corpus}.log" ;;
 sync)
   rsync -az --delete --exclude '__pycache__' --exclude '*.pyc' \
     src/fruitdrama "$SPARK:~/fruit/app/src/"
@@ -81,9 +86,60 @@ up)
   open "http://$SPARK:$GATEWAY_PORT/"
   ;;
 down) "${SSH[@]}" "tmux kill-session -t gateway 2>/dev/null; tmux kill-session -t model 2>/dev/null; echo stopped" ;;
+judge)
+  "${SSH[@]}" "cd ~/fruit/app && tmux kill-session -t judge 2>/dev/null; \
+    tmux new-session -d -s judge '~/fruit/venv/bin/python -u scripts/judge_corpus.py \
+      --accepted ~/fruit/run1/accepted.jsonl --out ~/fruit/run1/judged.jsonl \
+      --judge-url http://127.0.0.1:8000 --judge-model \${JUDGE_MODEL:-judge} \
+      --concurrency 16 2>&1 | tee ~/fruit/logs/judge.log'"
+  echo "judge pass started; follow with: ./ops/fruit logs judge"
+  ;;
+dataset)
+  "${SSH[@]}" "cd ~/fruit/app && ~/fruit/venv/bin/python scripts/build_dataset.py \
+    --accepted ~/fruit/run1/accepted.jsonl --judged ~/fruit/run1/judged.jsonl \
+    --out-prefix ~/fruit/run1/story_sft"
+  ;;
+train)
+  # Smoke first, always: it loads the model, runs one fwd/bwd and prints peak
+  # memory in about seven minutes. Starting a 15-hour run on an untested memory
+  # budget is how you lose a day.
+  echo "smoke test first..."
+  "${SSH[@]}" "cd ~/fruit/app && HF_HOME=\$HOME/fruit/hf HF_HUB_OFFLINE=1 \
+    ~/fruit/venv/bin/python -u training/train_lora_moe.py \
+      --train ~/fruit/run1/story_sft.train.jsonl --val ~/fruit/run1/story_sft.val.jsonl \
+      --smoke 2>&1 | tail -4"
+  read -r -p "smoke looked ok? start the full run [y/N] " ans
+  [ "$ans" = "y" ] || { echo aborted; exit 1; }
+  "${SSH[@]}" "cd ~/fruit/app && tmux kill-session -t train 2>/dev/null; \
+    tmux new-session -d -s train 'HF_HOME=\$HOME/fruit/hf HF_HUB_OFFLINE=1 \
+      ~/fruit/venv/bin/python -u training/train_lora_moe.py \
+      --train ~/fruit/run1/story_sft.train.jsonl --val ~/fruit/run1/story_sft.val.jsonl \
+      --out ~/fruit/out/qwen3-30b-a3b-fruit-lora 2>&1 | tee ~/fruit/logs/train.log'"
+  echo "training started; follow with: ./ops/fruit logs train"
+  ;;
 eval)
   "${SSH[@]}" "cd ~/fruit/app && ~/fruit/venv/bin/python eval/run_eval.py \
-    --endpoint http://127.0.0.1:8000 --model \${FRUIT_MODEL:-fruit} --tag \${TAG:-manual} --n 120"
+    --endpoint http://127.0.0.1:8000 --model \${FRUIT_MODEL:-fruit} --tag \${TAG:-manual} --n 120 \
+    --judge-url \${JUDGE_URL:-} --judge-model \${JUDGE_MODEL:-judge}"
+  ;;
+ab)
+  "${SSH[@]}" "cd ~/fruit/app && ~/fruit/venv/bin/python eval/ab_compare.py \
+    --a-url http://127.0.0.1:8000 --a-model \${A_MODEL:-fruit} --a-label candidate \
+    --b-url http://127.0.0.1:8001 --b-model \${B_MODEL:-base} --b-label base \
+    --judge-url \${JUDGE_URL:-http://127.0.0.1:8002} --judge-model \${JUDGE_MODEL:-judge} --n 120"
+  ;;
+serve)
+  GGUF="${2:?usage: fruit serve <gguf-path> <alias> [slots] [ctx]}"
+  ALIAS="${3:?alias required}"
+  "${SSH[@]}" "tmux kill-session -t model 2>/dev/null; sleep 3; \
+    tmux new-session -d -s model 'MODEL=$GGUF ALIAS=$ALIAS PORT=8000 \
+      SLOTS=${4:-8} CTX=${5:-65536} bash ~/fruit/app/serve/serve_llama.sh \
+      2>&1 | tee ~/fruit/logs/$ALIAS.log'"
+  printf "waiting for %s" "$ALIAS"
+  for _ in $(seq 1 120); do
+    "${SSH[@]}" "curl -sf localhost:8000/health >/dev/null" && { echo " ready"; break; }
+    printf "."; sleep 4
+  done
   ;;
 shell) exec ssh "$SPARK" -t "cd ~/fruit/app && exec bash -l" ;;
 *) usage; exit 1 ;;
