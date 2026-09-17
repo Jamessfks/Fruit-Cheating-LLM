@@ -109,8 +109,11 @@ class ResumableWriter:
         with self._lock:
             self._fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
             self._n += 1
+            # flush() every row so a multi-hour run can be monitored with
+            # `wc -l` from outside; fsync() only periodically, since that is
+            # the expensive call and losing <=N rows to a hard kill is fine.
+            self._fh.flush()
             if self._n % self.fsync_every == 0:
-                self._fh.flush()
                 os.fsync(self._fh.fileno())
 
     def close(self) -> None:
