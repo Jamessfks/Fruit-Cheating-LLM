@@ -45,6 +45,9 @@ def clean(text: str) -> str:
     if not text:
         return ""
     t = text.replace("\r\n", "\n").replace("\r", "\n")
+    # An emoji abutting a word ("<glyph>The air hung thick") renders badly and
+    # is purely a spacing artifact.
+    t = _EMOJI_ABUT.sub(r"\1 \2", t)
     t = re.sub(r"[ \t]+\n", "\n", t)
     t = re.sub(r"\n{3,}", "\n\n", t)
     return _safe(t.strip())
@@ -155,6 +158,9 @@ _PREAMBLE = re.compile(
     re.I,
 )
 _BULLET = re.compile(r"^[ \t]*[-*+\u2022][ \t]+", re.M)
+_EMOJI_ABUT = re.compile(
+    "([\U0001F300-\U0001FAFF\U0001F000-\U0001F0FF\u2600-\u27BF\u2B00-\u2BFF])"
+    "([A-Za-z])")
 
 
 def normalize_story(text: str) -> str:
@@ -176,6 +182,9 @@ def normalize_story(text: str) -> str:
             break
         t = new
     t = _BULLET.sub("", t)
+    # An emoji abutting a word ("<glyph>The air hung thick") renders badly and
+    # is purely a spacing artifact.
+    t = _EMOJI_ABUT.sub(r"\1 \2", t)
     t = re.sub(r"[ \t]+\n", "\n", t)
     t = re.sub(r"\n{3,}", "\n\n", t)
     return t.strip()

@@ -181,8 +181,10 @@ def check_story(
         floating, clause_final = T.emoji_position_stats(text)
         r.stats["floating_emoji"] = floating
         r.stats["clause_final_frac"] = round(clause_final, 3)
-        if floating > C.MAX_FLOATING_EMOJI:
-            r.fail("G5", f"{floating} emoji floating between sentences")
+        frac_floating = floating / n_emoji
+        r.stats["floating_frac"] = round(frac_floating, 3)
+        if floating > C.MAX_FLOATING_EMOJI or frac_floating > C.MAX_FLOATING_FRACTION:
+            r.fail("G5", f"{floating} of {n_emoji} emoji float between sentences")
         if clause_final > C.MAX_CLAUSE_FINAL_EMOJI_FRACTION:
             r.fail("G5", f"{clause_final:.0%} of emoji just end a clause")
 

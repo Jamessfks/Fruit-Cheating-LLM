@@ -53,7 +53,13 @@ MIN_SEGMENTS_WITH_EMOJI = 4            # of N_SEGMENTS -- style-stable spread te
 #     between sentences -- the worst form, capped hard.
 #   * an emoji immediately BEFORE a terminator ends a clause, which reads fine
 #     in moderation but becomes a tic if every sentence does it.
-MAX_FLOATING_EMOJI = 1
+# Raised from 1 after reading a story rejected at 3: 614 words, 9 emoji at
+# 1.47/100w, each attached to a concrete noun, genuinely good prose. Two or
+# three boundary emoji in a 9-20 emoji story is a flourish; the pattern only
+# becomes a tic when floating emoji DOMINATE, which the fraction cap catches
+# and an absolute cap of 1 does not distinguish.
+MAX_FLOATING_EMOJI = 3
+MAX_FLOATING_FRACTION = 0.40
 # Raised from 0.60 after reading a story at 0.615 that reads perfectly well.
 # The metric conflates two different things: an emoji attached to a concrete
 # noun that happens to END a sentence ("her ice sculptures [ice]." ) is

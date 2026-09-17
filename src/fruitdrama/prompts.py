@@ -14,6 +14,7 @@ between what we ask for, what we filter on, and what we score.
 from __future__ import annotations
 
 import json
+import math
 import textwrap
 
 from . import contract as C
@@ -29,8 +30,10 @@ def story_system() -> str:
     """
     lo, hi = C.WORD_MIN, C.WORD_MAX
     ask, ask_max = C.PROMPT_WORD_TARGET, C.PROMPT_WORD_MAX
-    emin = max(8, int(C.EMOJI_PER_100W_MIN * C.WORD_TARGET / 100))
-    emax = int(C.EMOJI_PER_100W_MAX * C.WORD_TARGET / 100)
+    # Floor must hold even for the longest story the gate will accept; ceiling
+    # is computed at the length we ask for, so a short story cannot exceed it.
+    emin = math.ceil(C.EMOJI_PER_100W_MIN * C.WORD_GATE_MAX / 100) + 2
+    emax = int(C.EMOJI_PER_100W_MAX * C.WORD_MIN / 100) - 1
     return textwrap.dedent(f"""\
         You write short fruit-drama stories: campy, vivid telenovela tales where
         fruits and vegetables are people who love, lie, scheme and betray each other.
@@ -43,8 +46,7 @@ def story_system() -> str:
           second title, no date lines, no chapter or part labels, no scene
           labels, no "Later"/"At the hospital" signposts, no NARRATION: or
           VISUAL: labels, no camera or stage directions in parentheses.
-        - About {ask} words. Never more than {ask_max}. Stop when the twist lands;
-          do not pad. That is a 2-3 minute read.
+        - About {ask} words. Never more than {ask_max}. That is a 2-3 minute read.
         - Plain prose only. No markdown of any kind: no asterisks, no bold, no
           italics, no headers, no bullets, no numbered lists.
         - Never scene headings, never NARRATION: or VISUAL: labels, never
@@ -70,6 +72,7 @@ def story_system() -> str:
             Her hands {'\U0001F91A'} shook as she read the second name.
 
         Not like this:
+            She found the receipt folded in his jacket. {'\U0001F9FE'} She said nothing.
             She found the receipt folded in his jacket. {'\U0001F9FE'}{'\U0001F494'}
             Bianca's plums hit the pavement {'\U0001F7E3'}{'\U0001F62D'}.
             Her hands shook {'\U0001F91A'}. She read the second name {'\U0001F494'}.
