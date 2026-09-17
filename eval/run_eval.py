@@ -31,6 +31,47 @@ from fruitdrama import teacher as T               # noqa: E402
 from fruitdrama.judge import score_story          # noqa: E402
 from fruitdrama.premises import PremiseEngine     # noqa: E402
 
+
+def load_frozen_premises(n: int | None = None) -> list:
+    """Load the frozen held-out set, refusing to run if it has drifted.
+
+    Regenerating from a seed would mean an eval before a premise-engine edit and
+    one after it silently measure different sets. The hash check makes that
+    impossible to do by accident.
+    """
+    path = _ROOT / "data" / "eval" / "heldout_premises.jsonl"
+    manifest = _ROOT / "data" / "eval" / "MANIFEST.sha256"
+    if not path.exists():
+        raise SystemExit(f"FATAL: {path} missing. Run scripts/build_eval_premises.py")
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    if manifest.exists():
+        expected = manifest.read_text().split()[0]
+        if digest != expected:
+            raise SystemExit(
+                f"FATAL: the frozen premise set has changed.\n"
+                f"  expected {expected}\n  found    {digest}\n"
+                f"Scores are only comparable within one premise-set version. "
+                f"Either restore the file or re-freeze with --force and treat "
+                f"previous scores as a different benchmark.")
+    rows = [json.loads(l) for l in path.read_text().splitlines() if l.strip()]
+    if n:
+        rows = rows[:n]
+
+    class P:  # minimal stand-in for a Premise
+        __slots__ = ("id", "user_prompt", "register", "is_human_premise",
+                     "is_adversarial", "facets")
+
+        def __init__(self, d):
+            self.id = d["id"]
+            self.user_prompt = d["premise"]
+            self.register = d.get("register")
+            self.is_human_premise = d.get("is_human_premise", False)
+            self.is_adversarial = d.get("is_adversarial", False)
+            self.facets = {"twist": d.get("twist_architecture"),
+                           "cast": d.get("cast")}
+
+    return [P(d) for d in rows], digest
+
 # Ship gate. A checkpoint that misses any of these does not ship; the miss is
 # reported with its actual value rather than rounded away.
 GATE = {
@@ -68,15 +109,15 @@ def main() -> int:
     ap.add_argument("--out-root", default="eval/runs")
     args = ap.parse_args()
 
+    # Validate the benchmark before the environment: a drifted premise set is a
+    # hard error whether or not a server is up.
+    premises, pset_hash = load_frozen_premises(args.n)
+
     cfg = T.GenConfig(base_url=args.endpoint, model=args.model,
                       concurrency=args.concurrency, max_tokens=1600)
     if not T.server_ready(cfg):
         print(f"FATAL: no server at {args.endpoint}", file=sys.stderr)
         return 2
-
-    premises = list(PremiseEngine(seed=args.premise_seed, mode="eval").generate(args.n))
-    pset_hash = hashlib.sha256(
-        "\n".join(p.user_prompt for p in premises).encode()).hexdigest()[:16]
 
     stamp = dt.datetime.utcnow().strftime("%Y-%m-%dT%H-%M-%SZ")
     out = pathlib.Path(args.out_root) / f"{stamp}__{args.tag}"

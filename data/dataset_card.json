@@ -1,25 +1,55 @@
 {
-  "built_at": "2026-07-23 16:25:55",
-  "total_rows": 44585,
-  "train_rows": 43694,
-  "val_rows": 891,
-  "approx_tokens": 32566329,
-  "by_slice": {
-    "writingprompts_twist": 21811,
-    "fruit_synth": 7500,
-    "gutenberg_melodrama": 1181,
-    "multichar": 12994,
-    "dramabench": 925,
-    "screenplay_voice": 107,
-    "screenplay_structure": 67
+  "built_at": "2026-09-17T17:58:00Z",
+  "prompt_version": "story.v1:0f4fd7a4",
+  "contract": {
+    "word_range": [
+      500,
+      750
+    ],
+    "emoji_per_100w": [
+      1.2,
+      5.0
+    ],
+    "twists_min": 3
   },
-  "by_license": {
-    "mit": 22910,
-    "ours": 7500,
-    "public-domain": 1181,
-    "cc-by-4.0": 12994
+  "rows": {
+    "total": 60,
+    "train": 59,
+    "val": 1
   },
-  "format": "chat messages (system/user/assistant) JSONL",
-  "policy": "permissive-license + platform-safe (SFW) only",
-  "note": "augmented with screenplay (deduped, <think> stripped) + gutenberg melodrama"
+  "words": {
+    "p10": 602,
+    "p50": 669,
+    "p90": 749,
+    "in_band": 0.917
+  },
+  "emoji": {
+    "p10": 10,
+    "p50": 14,
+    "p90": 17
+  },
+  "by_register": {
+    "degenerate": 3,
+    "command_meta": 5,
+    "terse": 17,
+    "one_line": 16,
+    "one_or_two_words": 4,
+    "verbose_constrained": 9,
+    "question": 4,
+    "typo": 2
+  },
+  "by_twist_architecture": {
+    "long-con revenge": 8,
+    "false paternity": 12,
+    "the dead return": 11,
+    "the accuser is guilty": 11,
+    "the victim orchestrated it": 3,
+    "the will was rewritten": 8,
+    "mistaken identity": 3,
+    "the confidant was the lover": 4
+  },
+  "human_premise_share": 0.283,
+  "distinct_3_diversity": 0.9382,
+  "unique_openings": 59,
+  "train_sha256": "49233f3762a6b5f0"
 }

@@ -189,6 +189,24 @@ check(all(set(p.facets["cast"]) <= set(hold["characters"]) for p in ev),
 check(not ({p.user_prompt for p in tr} & {p.user_prompt for p in ev}),
       "zero exact prompt overlap between train and eval")
 
+section("frozen eval premise set")
+_ev = _ROOT / "data" / "eval" / "heldout_premises.jsonl"
+_mf = _ROOT / "data" / "eval" / "MANIFEST.sha256"
+check(_ev.exists(), "frozen premise set exists")
+check(_mf.exists(), "manifest exists")
+if _ev.exists() and _mf.exists():
+    import hashlib as _h
+    check(_h.sha256(_ev.read_bytes()).hexdigest() == _mf.read_text().split()[0],
+          "frozen set matches its manifest hash")
+    _rows = [json.loads(l) for l in _ev.read_text().splitlines() if l.strip()]
+    check(len(_rows) == 120, f"120 frozen premises (got {len(_rows)})")
+    _hold = json.loads((_ROOT / "data" / "eval_holdout.json").read_text())
+    check(all(set(r["cast"]) <= set(_hold["characters"]) for r in _rows if r.get("cast")),
+          "every frozen premise uses only reserved characters")
+    _train = {p.user_prompt for p in PremiseEngine(seed=13, mode="train").generate(4000)}
+    check(not (_train & {r["premise"] for r in _rows}),
+          "zero overlap between the frozen set and a 4k training draw")
+
 section("contract self-consistency")
 check(C.WORD_GATE_MIN < C.WORD_MIN < C.WORD_TARGET < C.WORD_MAX < C.WORD_GATE_MAX,
       "word thresholds ordered")

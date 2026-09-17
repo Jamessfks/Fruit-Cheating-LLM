@@ -23,6 +23,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import pathlib
@@ -38,6 +39,47 @@ sys.path.insert(0, str(_ROOT / "src"))
 from fruitdrama import prompts as P            # noqa: E402
 from fruitdrama import teacher as T            # noqa: E402
 from fruitdrama.premises import PremiseEngine  # noqa: E402
+
+
+def load_frozen_premises(n: int | None = None) -> list:
+    """Load the frozen held-out set, refusing to run if it has drifted.
+
+    Regenerating from a seed would mean an eval before a premise-engine edit and
+    one after it silently measure different sets. The hash check makes that
+    impossible to do by accident.
+    """
+    path = _ROOT / "data" / "eval" / "heldout_premises.jsonl"
+    manifest = _ROOT / "data" / "eval" / "MANIFEST.sha256"
+    if not path.exists():
+        raise SystemExit(f"FATAL: {path} missing. Run scripts/build_eval_premises.py")
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    if manifest.exists():
+        expected = manifest.read_text().split()[0]
+        if digest != expected:
+            raise SystemExit(
+                f"FATAL: the frozen premise set has changed.\n"
+                f"  expected {expected}\n  found    {digest}\n"
+                f"Scores are only comparable within one premise-set version. "
+                f"Either restore the file or re-freeze with --force and treat "
+                f"previous scores as a different benchmark.")
+    rows = [json.loads(l) for l in path.read_text().splitlines() if l.strip()]
+    if n:
+        rows = rows[:n]
+
+    class P:  # minimal stand-in for a Premise
+        __slots__ = ("id", "user_prompt", "register", "is_human_premise",
+                     "is_adversarial", "facets")
+
+        def __init__(self, d):
+            self.id = d["id"]
+            self.user_prompt = d["premise"]
+            self.register = d.get("register")
+            self.is_human_premise = d.get("is_human_premise", False)
+            self.is_adversarial = d.get("is_adversarial", False)
+            self.facets = {"twist": d.get("twist_architecture"),
+                           "cast": d.get("cast")}
+
+    return [P(d) for d in rows], digest
 
 _VERDICT = re.compile(r"\b([AB])\b")
 
@@ -104,7 +146,8 @@ def main() -> int:
                        f"eval/runs/ab-{time.strftime('%Y-%m-%dT%H-%M-%SZ', time.gmtime())}")
     out.mkdir(parents=True, exist_ok=True)
 
-    premises = list(PremiseEngine(seed=args.premise_seed, mode="eval").generate(args.n))
+    # Benchmark integrity first, environment second.
+    premises, pset_hash = load_frozen_premises(args.n)
     acfg = T.GenConfig(base_url=args.a_url, model=args.a_model,
                        concurrency=args.concurrency, max_tokens=1600)
     bcfg = T.GenConfig(base_url=args.b_url, model=args.b_model,
@@ -164,6 +207,7 @@ def main() -> int:
         "win_rate_excl_ties": round(wins / decided, 3) if decided else None,
         "sign_test_p": round(sign_test_p(wins, losses), 5),
         "prompt_version": P.prompt_version(),
+        "premise_set_sha256": pset_hash,
     }
     (out / "summary.json").write_text(json.dumps(summary, indent=2))
     print(json.dumps(summary, indent=2))
