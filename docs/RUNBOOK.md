@@ -113,8 +113,11 @@ ssh spark-2e6c 'bash ~/fruit/app/serve/systemd/install.sh'
 ssh spark-2e6c 'systemctl --user enable --now fruit-model fruit-gateway'
 ```
 
-User units plus `loginctl enable-linger` give reboot survival without sudo. If
-polkit refuses linger, fall back to `@reboot` in crontab.
+User units plus `loginctl enable-linger` give reboot survival without sudo.
+**Verified on this box: `Linger=yes`** — polkit permits self-linger here, so the
+`@reboot` crontab fallback is documented in serve/systemd/install.sh but is not
+needed. `install.sh` writes `~/fruit/env/{model,gateway}.env` on first run and
+leaves both units *disabled*; enable them only once the merged GGUF exists.
 
 ## Traps
 
