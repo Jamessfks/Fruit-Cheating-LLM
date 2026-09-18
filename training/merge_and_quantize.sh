@@ -67,6 +67,12 @@ AutoTokenizer.from_pretrained(base).save_pretrained(out)
 print(f"MERGE_DONE in {time.time()-t0:.0f}s -> {out}")
 PY
 
+# Verified on this llama.cpp (4bc272f): Qwen3-MoE conversion IS supported, but
+# convert_hf_to_gguf.py is now a 312-line wrapper and the model classes were
+# moved to conversion/*.py -- grepping the main file for "qwen3" finds nothing
+# and looks like a missing architecture. The registration is
+# @ModelBase.register("Qwen3MoeForCausalLM") in conversion/qwen.py. Q5_K_M is
+# quant type 17.
 step "converting to GGUF (f16)"
 "$VENV/bin/python" "$LLAMA/convert_hf_to_gguf.py" "$MERGED" \
   --outfile "$GGUF_DIR/fruit-30b-a3b-f16.gguf" --outtype f16 2>&1 | tail -4

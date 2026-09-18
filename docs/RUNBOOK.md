@@ -86,6 +86,12 @@ Expected smoke output: `peak≈57.6 GiB`, `trainable 26.7M / 30.6B (0.087%)`,
 
 ## 5. Merge, quantize, serve
 
+Conversion support was verified ahead of time: `Qwen3MoeForCausalLM` is
+registered at `conversion/qwen.py:258` and `Q5_K_M` is quant type 17. Note that
+`convert_hf_to_gguf.py` is only a wrapper in this llama.cpp version — the model
+classes live in `conversion/*.py`, so grepping the main file for "qwen3" finds
+nothing and looks alarming without being a problem.
+
 ```bash
 ssh spark-2e6c 'cd ~/fruit/app && ADAPTER=~/fruit/out/qwen3-30b-a3b-fruit-lora \
   bash training/merge_and_quantize.sh'
