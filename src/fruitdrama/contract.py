@@ -54,7 +54,13 @@ EMOJI_PROMPT_TARGET = 22
 EMOJI_PER_SENTENCE_MIN = 0.33          # retained for reporting only
 EMOJI_PER_SENTENCE_MAX = 1.00
 MAX_EMOJI_PER_SENTENCE = 2             # 3+ in one sentence reads as spam
-MAX_ADJACENT_EMOJI_PAIRS = 1           # allow one 🍓💔 flourish per story
+# Same correction already applied to floating emoji: an absolute cap where a
+# fraction is the meaningful measure. Measured over 800 rejects, "adjacent runs"
+# was the single largest G4 cause (244 of 395) and 170 of those stories had FULL
+# 5/5 segment coverage -- they died on runs alone. A pairing like a berry plus a
+# broken heart is a flourish in this genre; runs are spam when they dominate.
+MAX_ADJACENT_EMOJI_PAIRS = 2
+MAX_ADJACENT_PAIR_FRACTION = 0.20
 MIN_PARAGRAPHS_WITH_EMOJI = 0.25       # reported; spread is enforced by segments
 N_SEGMENTS = 5                         # equal text spans
 MIN_SEGMENTS_WITH_EMOJI = 4            # of N_SEGMENTS -- style-stable spread test

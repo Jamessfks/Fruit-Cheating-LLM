@@ -176,8 +176,12 @@ def check_story(
     r.stats["segments_with_emoji"] = segs
     if segs < C.MIN_SEGMENTS_WITH_EMOJI:
         r.fail("G4", f"emoji reach only {segs}/{C.N_SEGMENTS} parts of the story")
-    if T.adjacent_emoji_pairs(body) > C.MAX_ADJACENT_EMOJI_PAIRS:
-        r.fail("G4", "emoji runs")
+    pairs = T.adjacent_emoji_pairs(body)
+    r.stats["adjacent_pairs"] = pairs
+    pairs_allowed = max(C.MAX_ADJACENT_EMOJI_PAIRS,
+                        int(C.MAX_ADJACENT_PAIR_FRACTION * n_emoji))
+    if pairs > pairs_allowed:
+        r.fail("G4", f"{pairs} adjacent emoji runs (allowed {pairs_allowed})")
 
     # G5 -- woven, not bolted on.
     if n_emoji:
