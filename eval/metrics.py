@@ -78,6 +78,11 @@ def story_metrics(stories: list[str], premises: list[str] | None = None) -> dict
         # names swapped?"
         "unique_openings_rate": round(len(openings) / n, 3),
         "unique_closings_rate": round(len(closings) / n, 3),
+        # NOTE: distinct-n is scale-dependent -- total n-grams grow faster than
+        # unique ones, so a larger corpus always scores lower. Only compare
+        # equal-sized samples. Measured on this corpus: 0.82 within any 500-row
+        # window but 0.66 across 3,017 rows, and that drop is arithmetic, not
+        # degradation (the first-500 and last-500 windows were 0.819 vs 0.810).
         "distinct_3": round(T.distinct_n(stories, 3), 4),
         "distinct_4": round(T.distinct_n(stories, 4), 4),
         "mean_pairwise_jaccard": round(_mean_pairwise_jaccard(stories), 4),
