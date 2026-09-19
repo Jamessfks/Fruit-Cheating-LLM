@@ -165,17 +165,24 @@ def main() -> int:
     t0 = time.time()
     prompt_v = P.prompt_version()
 
+    already_accepted = len(acc_w.done)
+
     def report():
         el = time.time() - t0
         acc = stats["accepted"]
         rate = acc / el * 3600 if el else 0
-        eta = (args.target - acc) / rate if rate else 0
+        # Remaining work is measured against the corpus on disk, not against
+        # this process's own counter -- otherwise every restart re-inflates the
+        # ETA by however much earlier instances already produced.
+        remaining = max(0, args.target - already_accepted - acc)
+        eta = remaining / rate if rate else 0
         print(
             f"[{el/60:6.1f}m] seen={stats['seen']:6d} accepted={acc:6d} "
             f"({100*acc/max(1,stats['seen']):4.1f}%) "
             f"gate_rej={stats['gate_rej']:6d} judge_rej={stats['judge_rej']:5d} "
             f"dup={stats['dup']:4d} err={stats['err']:4d} | "
-            f"{rate:5.0f} rows/h ETA {eta:4.1f}h",
+            f"{rate:5.0f} rows/h  total={already_accepted + acc:6d}"
+            f"  ETA {eta:4.1f}h",
             flush=True)
         if gate_rejects:
             print("        gates:", dict(gate_rejects.most_common(8)), flush=True)
