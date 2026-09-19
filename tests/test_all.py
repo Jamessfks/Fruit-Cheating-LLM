@@ -207,6 +207,27 @@ if _ev.exists() and _mf.exists():
     check(not (_train & {r["premise"] for r in _rows}),
           "zero overlap between the frozen set and a 4k training draw")
 
+section("ship gate resolves against a real metrics report")
+import importlib.util as _ilu
+_spec = _ilu.spec_from_file_location("_re", _ROOT / "eval" / "run_eval.py")
+_re = _ilu.module_from_spec(_spec); _spec.loader.exec_module(_re)
+sys.path.insert(0, str(_ROOT))
+from eval.metrics import story_metrics as _sm
+_report = {"metrics": _sm([g["story"] for g in gold], [g["premise"] for g in gold]),
+           "judge": {}}
+# Every non-judge gate key must actually resolve; they silently did not once,
+# and a gate whose every check was MISSING still reported PASS.
+for _k in _re.GATE:
+    if _k.startswith(_re.OPTIONAL_PREFIXES):
+        continue
+    check(_re.dig(_report, _k) is not None, f"gate key resolves: {_k}")
+# A report with nothing in it must FAIL, never pass by default.
+_empty_pass = True
+for _k, (_op, _thr) in _re.GATE.items():
+    if _re.dig({}, _k) is None and not _k.startswith(_re.OPTIONAL_PREFIXES):
+        _empty_pass = False
+check(not _empty_pass, "an empty report fails the gate rather than passing")
+
 section("contract self-consistency")
 check(C.WORD_GATE_MIN < C.WORD_MIN < C.WORD_TARGET < C.WORD_MAX < C.WORD_GATE_MAX,
       "word thresholds ordered")

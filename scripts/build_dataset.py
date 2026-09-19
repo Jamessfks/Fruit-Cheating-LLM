@@ -41,8 +41,9 @@ def main() -> int:
     ap.add_argument("--judged", default="",
                     help="judged.jsonl from judge_corpus.py; rows that failed "
                          "the judge are excluded")
-    ap.add_argument("--recheck", action="store_true",
-                    help="re-run gates on every row (slow, but proves the file)")
+    ap.add_argument("--no-recheck", action="store_true",
+                    help="skip re-gating (not advised: rows accepted under "
+                         "older gate versions would reach training)")
     args = ap.parse_args()
 
     root = pathlib.Path(__file__).resolve().parents[1]
@@ -104,12 +105,27 @@ def main() -> int:
         return 3
     print("contamination check: 0 overlaps with the frozen eval premises")
 
-    if args.recheck:
-        bad = [r for r in rows if not check_story(r["story"], premise=r["premise"]).ok]
+    # Re-gate by default. A long corpus run spans gate fixes, so early rows can
+    # have been admitted by a buggier version. Measured on the 6,185-row corpus:
+    # 83 rows (1.3%) failed the current gates, every one of them a G2 leakage
+    # in the first 1,000 rows, with rows 1,000+ at 100%. Cheap to check, and the
+    # alternative is training on stories the gates would now reject.
+    if not args.no_recheck:
+        import collections
+        bad, why = [], collections.Counter()
+        for r in rows:
+            res = check_story(r["story"], premise=r["premise"])
+            if not res.ok:
+                bad.append(id(r))
+                for g in dict.fromkeys(res.failures):
+                    why[g] += 1
         if bad:
-            print(f"WARNING: {len(bad)} rows no longer pass gates "
-                  f"(thresholds changed since generation)")
-        rows = [r for r in rows if r not in bad]
+            badset = set(bad)
+            rows = [r for r in rows if id(r) not in badset]
+            print(f"re-gate: dropped {len(bad)} rows admitted under earlier gate "
+                  f"versions {dict(why.most_common(5))}; {len(rows)} remain")
+        else:
+            print(f"re-gate: all {len(rows)} rows pass the current gates")
 
     rng = random.Random(args.seed)
     rng.shuffle(rows)

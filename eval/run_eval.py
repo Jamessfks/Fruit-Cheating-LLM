@@ -84,16 +84,21 @@ def load_frozen_premises(n: int | None = None) -> list:
 # is a relative judgement. Treat a green judge block as necessary, not
 # sufficient.
 GATE = {
-    "storyboard_leakage_rate": ("<=", 0.0),
-    "words.in_band_rate": (">=", 0.80),
-    "emoji.in_range_rate": (">=", 0.85),
-    "gate_pass_rate": (">=", 0.70),
-    "unique_openings_rate": (">=", 0.90),
-    "mean_pairwise_jaccard": ("<=", 0.12),
+    "metrics.storyboard_leakage_rate": ("<=", 0.0),
+    "metrics.words.in_band_rate": (">=", 0.80),
+    "metrics.emoji.in_range_rate": (">=", 0.85),
+    "metrics.gate_pass_rate": (">=", 0.70),
+    "metrics.unique_openings_rate": (">=", 0.90),
+    "metrics.mean_pairwise_jaccard": ("<=", 0.12),
     "judge.twists_ge2_rate": (">=", 0.85),
     "judge.fun_camp_voice_mean": (">=", 4.0),
     "judge.pg13_fail_count": ("<=", 0.0),
 }
+
+# Gates whose absence is acceptable: the judge block is empty when --judge-url
+# is not given, and a deterministic-only run is a legitimate mode. Every other
+# missing metric is a broken harness and must fail.
+OPTIONAL_PREFIXES = ("judge.",)
 
 
 def dig(d: dict, path: str):
@@ -193,8 +198,13 @@ def main() -> int:
     for path, (op, thr) in GATE.items():
         val = dig(report, path)
         if val is None:
+            optional = path.startswith(OPTIONAL_PREFIXES)
+            if not optional:
+                passed = False
             gate_rows.append({"metric": path, "value": None, "threshold": thr,
-                              "op": op, "status": "MISSING"})
+                              "op": op,
+                              "status": "SKIPPED (no judge)" if optional
+                                        else "MISSING -> FAIL"})
             continue
         ok = val <= thr if op == "<=" else val >= thr
         passed = passed and ok
