@@ -85,7 +85,8 @@ sync)
   rsync -az --delete --exclude '__pycache__' --exclude '*.pyc' \
     src/fruitdrama "$SPARK:~/fruit/app/src/"
   rsync -az scripts config serve eval training "$SPARK:~/fruit/app/"
-  rsync -az data/gold data/fruit_bible.json data/eval_holdout.json "$SPARK:~/fruit/app/data/"
+  rsync -az data/gold data/eval data/taxonomy.json data/fruit_bible.json \
+    data/eval_holdout.json "$SPARK:~/fruit/app/data/"
   echo "synced"
   ;;
 up)
