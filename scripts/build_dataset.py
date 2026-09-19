@@ -137,7 +137,8 @@ def main() -> int:
     emoji = [T.count_emoji(r["story"]) for r in rows]
     pct = lambda v, q: sorted(v)[int(len(v) * q)] if v else 0
     card = {
-        "built_at": __import__("datetime").datetime.utcnow().isoformat(timespec="seconds") + "Z",
+        "built_at": __import__("datetime").datetime.now(
+            __import__("datetime").timezone.utc).isoformat(timespec="seconds"),
         "prompt_version": P.prompt_version(),
         "contract": {
             "word_range": [C.WORD_MIN, C.WORD_MAX],
