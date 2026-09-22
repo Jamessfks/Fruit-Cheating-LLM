@@ -172,10 +172,12 @@ def main() -> int:
         "unique_openings": len({T.opening_ngram(r["story"], 6) for r in rows}),
         "train_sha256": hashlib.sha256(tp.read_bytes()).hexdigest()[:16],
     }
-    cp = pathlib.Path("data/dataset_card.json")
+    # Beside the dataset it describes, not relative to the caller's cwd.
+    cp = pathlib.Path(f"{args.out_prefix}.card.json")
+    cp.parent.mkdir(parents=True, exist_ok=True)
     cp.write_text(json.dumps(card, indent=2))
     print(json.dumps(card, indent=2))
-    print(f"\nwrote {tp} ({len(train)}) and {vp} ({len(val)})")
+    print(f"\nwrote {tp} ({len(train)}), {vp} ({len(val)}) and {cp}")
     return 0
 
 

@@ -33,6 +33,11 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+# Run from the app root: stage scripts may use repo-relative paths, and a
+# five-hour judge pass was once followed by a crash on the last line of stage 2
+# because the working directory was $HOME.
+cd "$APP" || { echo "cannot cd to $APP" >&2; exit 1; }
+
 mkdir -p "$LOGS"
 step() { echo; echo "=============== [$(date -u +%H:%M:%S)] STAGE $1: $2 ==============="; }
 die()  { echo "FAILED at stage $1: $2" >&2; exit 1; }
