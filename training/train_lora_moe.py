@@ -29,6 +29,7 @@ from __future__ import annotations
 import argparse
 import glob
 import json
+import math
 import os
 import pathlib
 import threading
@@ -210,6 +211,29 @@ def main() -> int:
     print(f"train rows {len(train_ds)}  val rows {len(val_ds) if val_ds else 0}", flush=True)
 
     if args.smoke:
+        # Construct the real TrainingArguments too: the smoke gate exists to
+        # catch configuration errors before a 15-hour run, and a bad Trainer
+        # kwarg is exactly that. transformers 5.17 removing warmup_ratio slipped
+        # through this gap once.
+        steps_per_epoch = max(1, math.ceil(len(train_ds) / (args.bsz * args.accum)))
+        total_steps = max(1, int(steps_per_epoch * args.epochs))
+        _ = TrainingArguments(
+            output_dir=args.out, num_train_epochs=args.epochs,
+            per_device_train_batch_size=args.bsz,
+            gradient_accumulation_steps=args.accum, learning_rate=args.lr,
+            lr_scheduler_type="cosine",
+            warmup_steps=max(10, int(0.03 * total_steps)),
+            max_grad_norm=1.0, bf16=True, optim="adamw_torch_fused",
+            gradient_checkpointing=True,
+            gradient_checkpointing_kwargs={"use_reentrant": False},
+            logging_steps=10, logging_first_step=True, save_strategy="steps",
+            save_steps=500, save_total_limit=4,
+            eval_strategy="steps" if val_ds else "no", eval_steps=500,
+            per_device_eval_batch_size=1, dataloader_num_workers=4,
+            remove_unused_columns=False, report_to="none", seed=42)
+        print(f"[SMOKE] TrainingArguments constructed ok "
+              f"({total_steps} steps planned)", flush=True)
+
         coll = Collator(tok)
         batch = coll([train_ds[i] for i in range(min(args.bsz, len(train_ds)))])
         batch = {k: v.to("cuda") for k, v in batch.items()}
@@ -223,6 +247,15 @@ def main() -> int:
         print("SMOKE_OK")
         return 0
 
+    # transformers 5.17 dropped warmup_ratio; warmup_steps is the survivor.
+    # Derive it so it follows epochs, batch size and dataset size rather than
+    # being a number that silently goes stale.
+    steps_per_epoch = max(1, math.ceil(len(train_ds) / (args.bsz * args.accum)))
+    total_steps = max(1, int(steps_per_epoch * args.epochs))
+    warmup = max(10, int(0.03 * total_steps))
+    print(f"schedule: {steps_per_epoch} steps/epoch x {args.epochs} epochs "
+          f"= {total_steps} steps, {warmup} warmup", flush=True)
+
     targs = TrainingArguments(
         output_dir=args.out,
         num_train_epochs=args.epochs,
@@ -230,7 +263,7 @@ def main() -> int:
         gradient_accumulation_steps=args.accum,
         learning_rate=args.lr,
         lr_scheduler_type="cosine",
-        warmup_ratio=0.03,
+        warmup_steps=warmup,
         max_grad_norm=1.0,
         bf16=True,
         optim="adamw_torch_fused",
